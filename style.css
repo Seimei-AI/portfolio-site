@@ -98,6 +98,39 @@ section h2 a {
   text-decoration: none;
 }
 
+/* 遊びゾーン（コツコツ成長ゲージ・ガチャ用の特別な枠） */
+section.play-zone {
+  background: linear-gradient(135deg, #eafaf3 0%, #e7f5fb 100%);
+  border: 2px dashed #7fd1b9;
+  box-shadow: none;
+  margin-top: 36px;
+  position: relative;
+}
+
+section.play-zone::before {
+  content: "☕ ひとやすみコーナー";
+  position: absolute;
+  top: -14px;
+  left: 24px;
+  background-color: #7fd1b9;
+  color: #17332b;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 4px 14px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+section.play-zone:hover {
+  transform: none;
+  box-shadow: 0 6px 16px rgba(127, 209, 185, 0.35);
+}
+
+section.play-zone h2 {
+  color: #1e7a5f;
+  border-bottom: 2px dashed #7fd1b9;
+}
+
 .blog-date {
   color: #999;
   font-size: 0.85rem;
