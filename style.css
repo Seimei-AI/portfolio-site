@@ -38,6 +38,38 @@ header {
   padding: 64px 20px;
   text-align: center;
   animation: fadeIn 0.8s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+header::before,
+header::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+header::before {
+  top: -70px;
+  right: -60px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(127, 209, 185, 0.35), transparent 70%);
+}
+
+header::after {
+  bottom: -90px;
+  left: -50px;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), transparent 70%);
+}
+
+header h1,
+header p {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes fadeIn {
@@ -83,6 +115,32 @@ section {
 section:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* アイコン付きリスト（できること） */
+.skill-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.skill-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skill-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  color: #7fd1b9;
+}
+
+.skill-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 section h2 {
