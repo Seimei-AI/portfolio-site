@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web制作格言ガチャ | Seimei Abe</title>
+  <meta name="description" content="Web制作にまつわる格言がランダムに出てくる、おまけの遊びページです。">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Web制作格言ガチャ | Seimei Abe">
+  <meta property="og:description" content="Web制作にまつわる格言がランダムに出てくる、おまけの遊びページです。">
+  <meta property="og:url" content="https://seimei-ai.github.io/portfolio-site/gacha.html">
+  <meta property="og:image" content="https://seimei-ai.github.io/portfolio-site/images/profile.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Web制作格言ガチャ | Seimei Abe">
+  <meta name="twitter:description" content="Web制作にまつわる格言がランダムに出てくる、おまけの遊びページです。">
+  <meta name="twitter:image" content="https://seimei-ai.github.io/portfolio-site/images/profile.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="works.html">Works</a>
+    <a href="blog.html">Blog</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <header>
+    <h1>Web制作格言ガチャ</h1>
+    <p>おまけのページです。気軽に回してみてください。</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>ガチャを回す</h2>
+      <p>ボタンを押すと、格言カードが1枚出てきます。何が出るかはお楽しみ。</p>
+      <div class="gacha-card" id="gacha-card">
+        <div class="gacha-card-inner">
+          <span class="gacha-emoji" id="gacha-emoji">🎴</span>
+          <p class="gacha-quote" id="gacha-quote">ボタンを押してガチャを回してみてください</p>
+        </div>
+      </div>
+      <button id="gacha-button" type="button">ガチャを回す</button>
+      <p><a href="index.html">← Homeに戻る</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Seimei Abe</p>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
