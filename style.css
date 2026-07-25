@@ -1,7 +1,7 @@
 /* ページ全体の基本設定 */
 body {
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  background-color: #f5f5f5;
+  background-color: #f4f6f8;
   color: #333;
   margin: 0;
   line-height: 1.7;
@@ -12,14 +12,18 @@ nav {
   background-color: #1e2a38;
   padding: 16px 20px;
   display: flex;
-  gap: 20px;
+  gap: 28px;
   justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 nav a {
   color: #fff;
   text-decoration: none;
   font-weight: bold;
+  letter-spacing: 0.02em;
   transition: color 0.2s ease;
 }
 
@@ -29,9 +33,9 @@ nav a:hover {
 
 /* ヘッダー */
 header {
-  background-color: #2c3e50;
+  background: linear-gradient(135deg, #1e2a38 0%, #2c3e50 55%, #34506b 100%);
   color: #fff;
-  padding: 50px 20px;
+  padding: 64px 20px;
   text-align: center;
   animation: fadeIn 0.8s ease;
 }
@@ -48,42 +52,45 @@ header {
 }
 
 header h1 {
-  margin: 0 0 8px;
-  font-size: 1.8rem;
+  margin: 0 0 12px;
+  font-size: 2rem;
   line-height: 1.5;
+  letter-spacing: 0.02em;
 }
 
 header p {
   margin: 0;
-  color: #cbd5e0;
+  color: #b9c6d4;
+  font-size: 1rem;
 }
 
 /* 本文エリア */
 main {
-  max-width: 600px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 48px 20px;
 }
 
 section {
   background-color: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 section:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
 }
 
 section h2 {
   margin-top: 0;
   color: #2c3e50;
   border-bottom: 2px solid #2c3e50;
-  padding-bottom: 6px;
+  padding-bottom: 8px;
+  font-size: 1.3rem;
 }
 
 section h2 a {
@@ -99,6 +106,108 @@ section h2 a {
 
 ul {
   padding-left: 20px;
+}
+
+/* Worksページ：作品カードのグリッド */
+.works-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.work-card {
+  background-color: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.work-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+}
+
+.work-card-body {
+  padding: 20px 22px 24px;
+}
+
+.work-card-body h2 {
+  margin-top: 0;
+  color: #2c3e50;
+  border-bottom: 2px solid #2c3e50;
+  padding-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.work-card-tag {
+  display: inline-block;
+  background-color: #e8f4f0;
+  color: #1e7a5f;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+/* ブラウザ風モックアップ枠（実サイトをiframeで縮小表示） */
+.browser-frame {
+  border-bottom: 1px solid #e2e6ea;
+}
+
+.browser-frame-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #e9edf1;
+  padding: 8px 12px;
+}
+
+.browser-frame-bar .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.red { background-color: #ff5f57; }
+.dot.yellow { background-color: #febc2e; }
+.dot.green { background-color: #28c840; }
+
+.browser-frame-url {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  color: #6b7683;
+  background-color: #fff;
+  border-radius: 4px;
+  padding: 2px 10px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-frame-viewport {
+  position: relative;
+  width: 100%;
+  padding-top: 62%;
+  overflow: hidden;
+  background-color: #f0f2f4;
+}
+
+.browser-frame-viewport iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 400%;
+  height: 400%;
+  transform: scale(0.25);
+  transform-origin: top left;
+  border: none;
+  pointer-events: none;
 }
 
 /* フォーム */
@@ -140,7 +249,7 @@ form button:hover {
 /* フッター */
 footer {
   text-align: center;
-  padding: 20px;
+  padding: 24px;
   font-size: 0.85rem;
   color: #777;
 }
@@ -148,18 +257,22 @@ footer {
 /* スマホ対応 */
 @media (max-width: 600px) {
   header {
-    padding: 30px 16px;
+    padding: 40px 16px;
   }
 
   header h1 {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
   }
 
   main {
-    padding: 20px 12px;
+    padding: 32px 12px;
   }
 
   section {
-    padding: 16px;
+    padding: 20px;
+  }
+
+  .works-grid {
+    grid-template-columns: 1fr;
   }
 }
