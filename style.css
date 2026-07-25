@@ -72,6 +72,36 @@ header p {
   z-index: 1;
 }
 
+/* Aboutページ用の明るいヘッダー */
+header.header-about {
+  background: linear-gradient(135deg, #fdf6ec 0%, #eafaf3 55%, #e7f5fb 100%);
+  color: #1e2a38;
+}
+
+header.header-about::before {
+  background: radial-gradient(circle, rgba(255, 196, 130, 0.4), transparent 70%);
+}
+
+header.header-about::after {
+  background: radial-gradient(circle, rgba(127, 209, 185, 0.4), transparent 70%);
+}
+
+header.header-about p {
+  color: #52606b;
+}
+
+.profile-photo {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
