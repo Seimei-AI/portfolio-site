@@ -291,6 +291,33 @@ ul {
   margin-bottom: 10px;
 }
 
+.work-card-tag.tag-pending {
+  background-color: #fdf1de;
+  color: #a9720a;
+}
+
+.work-card.is-pending {
+  cursor: default;
+}
+
+.work-card.is-pending:hover {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.browser-frame-viewport.is-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #10233d, #1c3654);
+  color: #cdae5c;
+  font-weight: bold;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 0 20px;
+}
+
 /* ブラウザ風モックアップ枠（実サイトをiframeで縮小表示） */
 .browser-frame {
   border-bottom: 1px solid #e2e6ea;
