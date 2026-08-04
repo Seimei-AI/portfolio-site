@@ -2,21 +2,17 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>スライムサッカー</title>
 <style>
   :root {
     --bg: #1a1c2c;
-    --sky: #3b5dc9;
-    --grass: #63c74d;
-    --line: #ffffff;
     --p1: #ef476f;
     --p2: #ffd166;
-    --ball: #f4f4f4;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    height: 100%;
+    min-height: 100%;
     background: var(--bg);
     color: #fff;
     font-family: "Courier New", monospace;
@@ -24,25 +20,32 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
+    padding: 10px;
     -webkit-font-smoothing: none;
+    overscroll-behavior: none;
   }
   h1 {
     font-size: 20px;
     letter-spacing: 4px;
     text-shadow: 2px 2px 0 #000;
+    text-align: center;
   }
+  .legend { display:flex; gap:22px; font-size:12px; flex-wrap:wrap; justify-content:center; }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .dot { width:12px; height:12px; border:2px solid #000; }
   #wrap {
     position: relative;
     image-rendering: pixelated;
+    line-height: 0;
   }
   canvas {
     display: block;
+    width: min(96vw, 640px);
+    height: auto;
     border: 4px solid #000;
     box-shadow: 0 0 0 4px #444, 6px 6px 0 4px #000;
     image-rendering: pixelated;
-    max-width: 96vw;
-    height: auto;
   }
   #overlay {
     position: absolute;
@@ -52,51 +55,103 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    background: rgba(10,12,22,0.82);
+    background: rgba(10,12,22,0.86);
     text-align: center;
-    padding: 20px;
+    padding: 16px;
+    line-height: 1.6;
   }
   #overlay.hidden { display: none; }
-  #overlay h2 { font-size: 26px; text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
-  #overlay p { font-size: 13px; line-height: 1.9; opacity: 0.9; }
+  #overlay h2 { font-size: clamp(18px,5vw,26px); text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
+  #overlay p { font-size: clamp(11px,3vw,13px); line-height: 1.8; opacity: 0.9; }
   .key { background:#000; border:2px solid #666; border-radius:4px; padding:1px 7px; margin:0 2px; }
-  button {
+  .btnrow { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  button.mode {
     font-family: inherit;
     font-size: 15px;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     color: #000;
     background: var(--p2);
     border: none;
     border-bottom: 4px solid #b8952f;
-    padding: 12px 26px;
+    padding: 12px 22px;
     cursor: pointer;
     text-shadow: none;
+    line-height: 1.3;
   }
-  button:active { transform: translateY(2px); border-bottom-width: 2px; }
-  .legend { display:flex; gap:26px; font-size:12px; margin-top:4px; }
-  .legend span { display:flex; align-items:center; gap:6px; }
-  .dot { width:12px; height:12px; border:2px solid #000; }
+  button.mode.alt { background: var(--p1); border-bottom-color:#a5294a; color:#fff; }
+  button.mode small { font-size: 10px; opacity: 0.8; display:block; }
+  button.mode:active { transform: translateY(2px); border-bottom-width: 2px; }
   .foot { font-size: 11px; opacity: 0.5; }
+
+  /* タッチ操作パッド */
+  #touch {
+    display: none;
+    justify-content: space-between;
+    width: min(96vw, 640px);
+    gap: 20px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #touch.show { display: flex; }
+  #touch.solo { justify-content: center; }
+  #touch.solo .pad-right { display: none; }
+  .pad { display: flex; gap: 10px; }
+  .pad-left { border-bottom: 3px solid var(--p1); padding-bottom: 4px; }
+  .pad-right { border-bottom: 3px solid var(--p2); padding-bottom: 4px; }
+  .tbtn {
+    width: 62px; height: 62px;
+    font-size: 24px; color: #fff;
+    background: rgba(0,0,0,0.55);
+    border: 2px solid #888; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pad-left .tbtn.jump { background: rgba(239,71,111,0.65); border-color:#ef476f; }
+  .pad-right .tbtn.jump { background: rgba(255,209,102,0.65); border-color:#ffd166; color:#111; }
+  .tbtn.active { transform: translateY(2px); filter: brightness(1.5); }
+  @media (max-width: 430px) { .tbtn { width: 52px; height: 52px; font-size: 20px; } .pad { gap: 7px; } #touch { gap: 12px; } }
+  @media (max-width: 380px) { .tbtn { width: 46px; height: 46px; font-size: 18px; } .pad { gap: 6px; } #touch { gap: 8px; } }
+  @media (min-width: 760px) and (hover: hover) { .legend.pc { display: flex; } }
 </style>
 </head>
 <body>
   <h1>⚽ スライムサッカー ⚽</h1>
   <div class="legend">
-    <span><i class="dot" style="background:var(--p1)"></i>P1: A / D 移動・W ジャンプ</span>
-    <span><i class="dot" style="background:var(--p2)"></i>P2: ← / → 移動・↑ ジャンプ</span>
+    <span><i class="dot" style="background:var(--p1)"></i>P1</span>
+    <span><i class="dot" style="background:var(--p2)"></i>P2</span>
+    <span style="opacity:.7">5点先取</span>
   </div>
+
   <div id="wrap">
     <canvas id="game" width="640" height="360"></canvas>
     <div id="overlay">
       <h2 id="ov-title">スライムサッカー</h2>
       <p id="ov-body">
-        5点先取で勝ち。<br>
-        <b style="color:var(--p1)">P1</b>: <span class="key">A</span><span class="key">D</span>移動 <span class="key">W</span>ジャンプ<br>
-        <b style="color:var(--p2)">P2</b>: <span class="key">←</span><span class="key">→</span>移動 <span class="key">↑</span>ジャンプ<br>
-        （1人でも遊べます。P2は動かさなければ止まったまま）
+        ボールを相手ゴールに入れて<b>5点先取</b>で勝ち。<br>
+        <b style="color:var(--p1)">PC操作</b> P1: <span class="key">A</span><span class="key">D</span><span class="key">W</span> ／
+        P2: <span class="key">←</span><span class="key">→</span><span class="key">↑</span><br>
+        <b style="color:var(--p2)">スマホ</b>は画面下のボタンで操作（横向き推奨）
       </p>
-      <button id="startBtn">スタート</button>
+      <div class="btnrow">
+        <button class="mode alt" id="btn1p">1人で遊ぶ<small>CPUと対戦</small></button>
+        <button class="mode" id="btn2p">2人で遊ぶ<small>対戦</small></button>
+      </div>
       <p class="foot">R キーでリスタート</p>
+    </div>
+  </div>
+
+  <div id="touch">
+    <div class="pad pad-left">
+      <div class="tbtn" data-k="a">◀</div>
+      <div class="tbtn" data-k="d">▶</div>
+      <div class="tbtn jump" data-k="w">▲</div>
+    </div>
+    <div class="pad pad-right">
+      <div class="tbtn jump" data-k="arrowup">▲</div>
+      <div class="tbtn" data-k="arrowleft">◀</div>
+      <div class="tbtn" data-k="arrowright">▶</div>
     </div>
   </div>
 
@@ -105,71 +160,81 @@
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
-  const GROUND = H - 40;            // 地面のy
+  const GROUND = H - 40;
   const GRAV = 0.55;
   const WIN_SCORE = 5;
+  const GOAL_W = 12, GOAL_H = 90;
 
-  // 色
   const C = {
     sky1:'#3b5dc9', sky2:'#5b6ee1',
     grass:'#63c74d', grassDark:'#3e8948',
-    line:'#ffffff',
     p1:'#ef476f', p1dk:'#a5294a',
     p2:'#ffd166', p2dk:'#b8952f',
-    ball:'#f4f4f4', ballShadow:'rgba(0,0,0,0.25)',
-    post:'#e6e6e6'
+    ball:'#f4f4f4', post:'#e6e6e6'
   };
 
-  const GOAL_W = 12;
-  const GOAL_H = 90;
-
   function makeSlime(x, color, colorDk, isLeft) {
-    return {
-      x, y: GROUND, vx:0, vy:0, r:34,
-      color, colorDk, isLeft,
-      onGround:true, speed:4.4, jump:12
-    };
+    return { x, y:GROUND, vx:0, vy:0, r:34, color, colorDk, isLeft,
+             onGround:true, speed:4.4, jump:12 };
   }
-  let p1, ball, p2, keys, score, state, winner, msg, shakeT, sparks;
+  let p1, p2, ball, keys, score, state, msg, shakeT, sparks, mode;
 
   function reset(full) {
     p1 = makeSlime(W*0.25, C.p1, C.p1dk, true);
     p2 = makeSlime(W*0.75, C.p2, C.p2dk, false);
     resetBall(Math.random()<0.5?-1:1);
-    if (full) { score = [0,0]; }
-    winner = null;
-    sparks = [];
-    shakeT = 0;
+    if (full) score = [0,0];
+    sparks = []; shakeT = 0;
   }
   function resetBall(dir) {
-    ball = { x: W/2, y: 120, vx: dir*2, vy: 0, r: 13 };
+    ball = { x:W/2, y:120, vx:dir*2, vy:0, r:13 };
     msg = null;
   }
 
-  keys = {};
-  score = [0,0];
-  state = 'menu'; // menu | play | goal | over
+  keys = {}; score = [0,0]; state = 'menu'; mode = 'cpu';
   reset(true);
 
-  // ---- 入力 ----
+  // ---- キーボード入力 ----
   window.addEventListener('keydown', e => {
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
     keys[e.key.toLowerCase()] = true;
-    if (e.key.toLowerCase() === 'r') { reset(true); state='play'; hideOverlay(); }
+    if (e.key.toLowerCase() === 'r' && state !== 'menu') startGame(mode);
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
+  // ---- タッチ入力 ----
+  const isTouch = window.matchMedia('(pointer: coarse)').matches
+    || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const touchEl = document.getElementById('touch');
+  document.querySelectorAll('.tbtn').forEach(btn => {
+    const k = btn.dataset.k;
+    const press = e => { e.preventDefault(); keys[k] = true; btn.classList.add('active'); };
+    const release = e => { e.preventDefault(); keys[k] = false; btn.classList.remove('active'); };
+    btn.addEventListener('pointerdown', press);
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointerleave', release);
+    btn.addEventListener('pointercancel', release);
+  });
+
+  // ---- メニュー ----
   const overlay = document.getElementById('overlay');
   const ovTitle = document.getElementById('ov-title');
   const ovBody = document.getElementById('ov-body');
-  const startBtn = document.getElementById('startBtn');
   function hideOverlay(){ overlay.classList.add('hidden'); }
   function showOverlay(){ overlay.classList.remove('hidden'); }
-  startBtn.addEventListener('click', () => {
-    if (state === 'over' || state === 'menu') { reset(true); }
+  document.getElementById('btn1p').addEventListener('click', () => startGame('cpu'));
+  document.getElementById('btn2p').addEventListener('click', () => startGame('vs'));
+
+  function startGame(m) {
+    mode = m;
+    keys = {};
+    document.querySelectorAll('.tbtn.active').forEach(b=>b.classList.remove('active'));
+    reset(true);
     state = 'play';
     hideOverlay();
-  });
+    touchEl.classList.toggle('show', isTouch);
+    touchEl.classList.toggle('solo', mode === 'cpu');
+  }
 
   // ---- 物理 ----
   function moveSlime(s, left, right, jump) {
@@ -177,38 +242,58 @@
     if (keys[left]) s.vx = -s.speed;
     if (keys[right]) s.vx = s.speed;
     if (keys[jump] && s.onGround) { s.vy = -s.jump; s.onGround = false; }
-    s.x += s.vx;
-    s.y += s.vy;
+    applyMotion(s);
+  }
+  function applyMotion(s) {
+    s.x += s.vx; s.y += s.vy;
     if (!s.onGround) s.vy += GRAV;
     if (s.y >= GROUND) { s.y = GROUND; s.vy = 0; s.onGround = true; }
-    // 自陣の外に出ない（中央ラインで区切る）
     const minX = s.isLeft ? s.r : W/2 + s.r*0.15;
     const maxX = s.isLeft ? W/2 - s.r*0.15 : W - s.r;
     s.x = Math.max(minX, Math.min(maxX, s.x));
   }
 
+  // ---- CPU ----
+  let cpuTimer = 0, cpuAim = W*0.75;
+  function cpuControl(s) {
+    cpuTimer--;
+    if (cpuTimer <= 0) {
+      cpuTimer = 6 + Math.floor(Math.random()*6);
+      const onMySide = ball.x > W/2 - 50;
+      const coming = ball.vx > -0.6;
+      if (onMySide || coming) {
+        cpuAim = ball.x + 20 + (Math.random()*26 - 13);
+      } else {
+        cpuAim = W*0.72 + (Math.random()*20 - 10);
+      }
+    }
+    const spd = s.speed * 0.9;
+    if (s.x < cpuAim - 6) s.vx = spd;
+    else if (s.x > cpuAim + 6) s.vx = -spd;
+    else s.vx = 0;
+    const dx = Math.abs(ball.x - s.x);
+    const ballAbove = ball.y < s.y - s.r*0.4;
+    if (s.onGround && dx < s.r + ball.r + 16 && ballAbove && ball.y > 55) {
+      s.vy = -s.jump; s.onGround = false;
+    }
+    applyMotion(s);
+  }
+
   function collideSlimeBall(s) {
-    // スライムは上半分の半円。中心はs.x, s.y(足元)
-    const dx = ball.x - s.x;
-    const dy = ball.y - s.y;
+    const dx = ball.x - s.x, dy = ball.y - s.y;
     const dist = Math.hypot(dx, dy);
     const minD = s.r + ball.r;
     if (dist < minD && dy <= 2) {
-      const nx = dx / (dist||1);
-      const ny = dy / (dist||1);
-      // 押し出し
-      ball.x = s.x + nx * minD;
-      ball.y = s.y + ny * minD;
-      // 反射＋スライムの速度を加算
+      const nx = dx/(dist||1), ny = dy/(dist||1);
+      ball.x = s.x + nx*minD;
+      ball.y = s.y + ny*minD;
       const relDot = (ball.vx - s.vx)*nx + (ball.vy - s.vy)*ny;
       ball.vx -= 2*relDot*nx;
       ball.vy -= 2*relDot*ny;
       ball.vx = ball.vx*0.9 + s.vx*0.6;
-      ball.vy = ball.vy*0.9 + s.vy*0.6 - 1.2; // ちょい上に浮く
-      // 速度制限
-      const sp = Math.hypot(ball.vx, ball.vy);
-      const cap = 14;
-      if (sp > cap){ ball.vx *= cap/sp; ball.vy *= cap/sp; }
+      ball.vy = ball.vy*0.9 + s.vy*0.6 - 1.2;
+      const sp = Math.hypot(ball.vx, ball.vy), cap = 14;
+      if (sp > cap) { ball.vx *= cap/sp; ball.vy *= cap/sp; }
       spawnSparks(ball.x, ball.y, s.color);
     }
   }
@@ -216,37 +301,22 @@
   function updateBall() {
     ball.vy += GRAV*0.6;
     ball.vx *= 0.995;
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-
-    // 壁
-    if (ball.x < ball.r){ ball.x = ball.r; ball.vx = Math.abs(ball.vx)*0.85; }
-    if (ball.x > W-ball.r){ ball.x = W-ball.r; ball.vx = -Math.abs(ball.vx)*0.85; }
-    if (ball.y < ball.r){ ball.y = ball.r; ball.vy = Math.abs(ball.vy)*0.7; }
-
-    // ゴールポスト（バーに当たる）
+    ball.x += ball.vx; ball.y += ball.vy;
+    if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx)*0.85; }
+    if (ball.x > W-ball.r) { ball.x = W-ball.r; ball.vx = -Math.abs(ball.vx)*0.85; }
+    if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy)*0.7; }
     const barY = GROUND - GOAL_H;
-    // 左ゴール
-    if (ball.x < GOAL_W + ball.r && ball.y > barY - ball.r && ball.y < barY + 6 && ball.vy>0) {
-      // バーの上に乗る
-      if (ball.y < barY) { ball.y = barY - ball.r; ball.vy = -Math.abs(ball.vy)*0.6; }
-    }
-    if (ball.x > W - GOAL_W - ball.r && ball.y > barY - ball.r && ball.y < barY + 6 && ball.vy>0) {
-      if (ball.y < barY) { ball.y = barY - ball.r; ball.vy = -Math.abs(ball.vy)*0.6; }
-    }
-
-    // 地面
+    if (ball.x < GOAL_W + ball.r && ball.y > barY - ball.r && ball.y < barY + 6 && ball.vy>0 && ball.y < barY) { ball.y = barY - ball.r; ball.vy = -Math.abs(ball.vy)*0.6; }
+    if (ball.x > W - GOAL_W - ball.r && ball.y > barY - ball.r && ball.y < barY + 6 && ball.vy>0 && ball.y < barY) { ball.y = barY - ball.r; ball.vy = -Math.abs(ball.vy)*0.6; }
     if (ball.y > GROUND - ball.r) {
       ball.y = GROUND - ball.r;
       ball.vy = -Math.abs(ball.vy)*0.7;
       ball.vx *= 0.96;
       if (Math.abs(ball.vy) < 1) ball.vy = 0;
     }
-
-    // ゴール判定（バーより下、端に入った）
     if (ball.y > barY && ball.y < GROUND) {
-      if (ball.x < GOAL_W + ball.r) { goal(1); }
-      else if (ball.x > W - GOAL_W - ball.r) { goal(0); }
+      if (ball.x < GOAL_W + ball.r) goal(1);
+      else if (ball.x > W - GOAL_W - ball.r) goal(0);
     }
   }
 
@@ -256,135 +326,102 @@
     spawnSparks(ball.x, ball.y, scorer===0?C.p1:C.p2, 26);
     if (score[scorer] >= WIN_SCORE) {
       state = 'over';
-      winner = scorer;
-      ovTitle.textContent = (scorer===0?'P1':'P2') + ' の勝ち！ 🏆';
+      const p1win = scorer === 0;
+      const who = mode==='cpu' ? (p1win ? 'あなたの勝ち！ 🏆' : 'CPUの勝ち… 🤖') : ((p1win?'P1':'P2') + ' の勝ち！ 🏆');
+      ovTitle.textContent = who;
       ovBody.innerHTML = `最終スコア <b style="color:var(--p1)">${score[0]}</b> - <b style="color:var(--p2)">${score[1]}</b><br>もう一度遊ぶ？`;
-      startBtn.textContent = 'もう一度';
+      touchEl.classList.remove('show');
       showOverlay();
     } else {
       state = 'goal';
       msg = 'GOAL!';
-      setTimeout(() => { if(state==='goal'){ resetBall(scorer===0?1:-1); state='play'; } }, 900);
+      setTimeout(() => { if (state==='goal') { resetBall(scorer===0?1:-1); state='play'; } }, 900);
     }
   }
 
-  function spawnSparks(x,y,color,n=8){
-    for(let i=0;i<n;i++){
-      const a = Math.random()*Math.PI*2;
-      const sp = 2+Math.random()*4;
+  function spawnSparks(x,y,color,n=8) {
+    for (let i=0;i<n;i++) {
+      const a = Math.random()*Math.PI*2, sp = 2+Math.random()*4;
       sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:20+Math.random()*10,color});
     }
   }
-  function updateSparks(){
-    for(let i=sparks.length-1;i>=0;i--){
-      const s=sparks[i];
+  function updateSparks() {
+    for (let i=sparks.length-1;i>=0;i--) {
+      const s = sparks[i];
       s.x+=s.vx; s.y+=s.vy; s.vy+=0.3; s.life--;
-      if(s.life<=0) sparks.splice(i,1);
+      if (s.life<=0) sparks.splice(i,1);
     }
   }
 
   // ---- 描画 ----
   function drawBG() {
-    // 空グラデ
     const g = ctx.createLinearGradient(0,0,0,GROUND);
-    g.addColorStop(0, C.sky1); g.addColorStop(1, C.sky2);
+    g.addColorStop(0,C.sky1); g.addColorStop(1,C.sky2);
     ctx.fillStyle = g; ctx.fillRect(0,0,W,GROUND);
-    // 雲（ピクセルブロック）
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     puff(90,60,3); puff(470,44,4); puff(300,80,2);
-    // 地面
     ctx.fillStyle = C.grass; ctx.fillRect(0,GROUND,W,H-GROUND);
     ctx.fillStyle = C.grassDark;
-    for(let x=0;x<W;x+=16){ ctx.fillRect(x, GROUND, 8, 6); }
-    // センターライン
+    for (let x=0;x<W;x+=16) ctx.fillRect(x,GROUND,8,6);
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    for(let y=20;y<GROUND;y+=22){ ctx.fillRect(W/2-2, y, 4, 12); }
+    for (let y=20;y<GROUND;y+=22) ctx.fillRect(W/2-2,y,4,12);
   }
-  function puff(x,y,s){
-    const u=10;
-    ctx.fillRect(x, y, u*s, u);
-    ctx.fillRect(x+u, y-u, u*(s-1), u);
-  }
+  function puff(x,y,s){ const u=10; ctx.fillRect(x,y,u*s,u); ctx.fillRect(x+u,y-u,u*(s-1),u); }
 
   function drawGoals() {
     const barY = GROUND - GOAL_H;
-    ctx.fillStyle = C.post;
-    // ネット風
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillRect(0, barY, GOAL_W, GOAL_H);
-    ctx.fillRect(W-GOAL_W, barY, GOAL_W, GOAL_H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    for(let i=0;i<=GOAL_W;i+=4){
+    ctx.fillRect(0,barY,GOAL_W,GOAL_H);
+    ctx.fillRect(W-GOAL_W,barY,GOAL_W,GOAL_H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+    for (let i=0;i<=GOAL_W;i+=4) {
       ctx.beginPath(); ctx.moveTo(i,barY); ctx.lineTo(i,GROUND); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(W-GOAL_W+i,barY); ctx.lineTo(W-GOAL_W+i,GROUND); ctx.stroke();
     }
-    // バー（ポスト）
     ctx.fillStyle = C.post;
-    ctx.fillRect(0, barY-6, GOAL_W+6, 6);
-    ctx.fillRect(GOAL_W, barY-6, 6, GOAL_H+6);
-    ctx.fillRect(W-GOAL_W-6, barY-6, GOAL_W+6, 6);
-    ctx.fillRect(W-GOAL_W-6, barY-6, 6, GOAL_H+6);
+    ctx.fillRect(0,barY-6,GOAL_W+6,6);
+    ctx.fillRect(GOAL_W,barY-6,6,GOAL_H+6);
+    ctx.fillRect(W-GOAL_W-6,barY-6,GOAL_W+6,6);
+    ctx.fillRect(W-GOAL_W-6,barY-6,6,GOAL_H+6);
   }
 
   function drawSlime(s) {
-    // 影
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath();
-    ctx.ellipse(s.x, GROUND+2, s.r*0.9, 6, 0, 0, Math.PI*2);
-    ctx.fill();
-    // 本体（半円）
+    ctx.beginPath(); ctx.ellipse(s.x,GROUND+2,s.r*0.9,6,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = s.color;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, Math.PI, 0);
-    ctx.closePath();
-    ctx.fill();
-    // 下側の濃い縁
-    ctx.fillStyle = s.colorDk;
-    ctx.fillRect(s.x - s.r, s.y-2, s.r*2, 3);
-    // ハイライト
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,Math.PI,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = s.colorDk; ctx.fillRect(s.x-s.r,s.y-2,s.r*2,3);
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(s.x - s.r*0.35, s.y - s.r*0.5, s.r*0.22, s.r*0.14, -0.5, 0, Math.PI*2);
-    ctx.fill();
-    // 目（ボールの方を見る）
-    const ex = s.isLeft ? s.x + s.r*0.35 : s.x - s.r*0.35;
-    const ey = s.y - s.r*0.55;
+    ctx.beginPath(); ctx.ellipse(s.x-s.r*0.35,s.y-s.r*0.5,s.r*0.22,s.r*0.14,-0.5,0,Math.PI*2); ctx.fill();
+    const ex = s.isLeft ? s.x+s.r*0.35 : s.x-s.r*0.35;
+    const ey = s.y-s.r*0.55;
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(ex, ey, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex,ey,7,0,Math.PI*2); ctx.fill();
     const look = Math.atan2(ball.y-ey, ball.x-ex);
     ctx.fillStyle = '#111';
     ctx.beginPath(); ctx.arc(ex+Math.cos(look)*3, ey+Math.sin(look)*3, 3.5, 0, Math.PI*2); ctx.fill();
   }
 
   function drawBall() {
-    // 影
-    const shY = GROUND;
-    const shScale = Math.max(0.3, 1 - (shY-ball.y)/300);
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.beginPath();
-    ctx.ellipse(ball.x, GROUND+2, ball.r*shScale, 5, 0,0,Math.PI*2);
-    ctx.fill();
-    // ボール
+    const shScale = Math.max(0.3, 1-(GROUND-ball.y)/300);
+    ctx.beginPath(); ctx.ellipse(ball.x,GROUND+2,ball.r*shScale,5,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = C.ball;
-    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
-    // パネル（サッカーボール風）
+    ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = '#222';
     const a = performance.now()/200 + ball.x/20;
-    for(let i=0;i<5;i++){
+    for (let i=0;i<5;i++) {
       const ang = a + i*(Math.PI*2/5);
-      const px = ball.x + Math.cos(ang)*ball.r*0.5;
-      const py = ball.y + Math.sin(ang)*ball.r*0.5;
-      ctx.beginPath(); ctx.arc(px,py,2.4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ball.x+Math.cos(ang)*ball.r*0.5, ball.y+Math.sin(ang)*ball.r*0.5, 2.4, 0, Math.PI*2); ctx.fill();
     }
-    ctx.beginPath(); ctx.arc(ball.x, ball.y, 2.6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ball.x,ball.y,2.6,0,Math.PI*2); ctx.fill();
   }
 
-  function drawSparks(){
-    for(const s of sparks){
+  function drawSparks() {
+    for (const s of sparks) {
       ctx.globalAlpha = Math.max(0, s.life/30);
       ctx.fillStyle = s.color;
-      ctx.fillRect(s.x-2, s.y-2, 4, 4);
+      ctx.fillRect(s.x-2,s.y-2,4,4);
     }
     ctx.globalAlpha = 1;
   }
@@ -392,47 +429,37 @@
   function drawHUD() {
     ctx.font = 'bold 34px "Courier New", monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = C.p1;
-    ctx.fillText(score[0], W/2 - 44, 46);
-    ctx.fillStyle = '#fff';
-    ctx.fillText('-', W/2, 46);
-    ctx.fillStyle = C.p2;
-    ctx.fillText(score[1], W/2 + 44, 46);
-
+    ctx.fillStyle = C.p1; ctx.fillText(score[0], W/2-44, 46);
+    ctx.fillStyle = '#fff'; ctx.fillText('-', W/2, 46);
+    ctx.fillStyle = C.p2; ctx.fillText(score[1], W/2+44, 46);
+    if (mode === 'cpu') {
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText('YOU', W*0.25, 24);
+      ctx.fillText('CPU', W*0.75, 24);
+    }
     if (state==='goal' && msg) {
       ctx.font = 'bold 48px "Courier New", monospace';
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
-      ctx.strokeText(msg, W/2, H/2);
-      ctx.fillText(msg, W/2, H/2);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
+      ctx.strokeText(msg, W/2, H/2); ctx.fillText(msg, W/2, H/2);
     }
   }
 
-  // ---- ループ ----
   function loop() {
     if (state === 'play') {
       moveSlime(p1, 'a', 'd', 'w');
-      moveSlime(p2, 'arrowleft', 'arrowright', 'arrowup');
+      if (mode === 'cpu') cpuControl(p2);
+      else moveSlime(p2, 'arrowleft', 'arrowright', 'arrowup');
       updateBall();
       collideSlimeBall(p1);
       collideSlimeBall(p2);
     }
     updateSparks();
     if (shakeT>0) shakeT--;
-
     ctx.save();
-    if (shakeT>0) {
-      ctx.translate((Math.random()-0.5)*shakeT*0.6, (Math.random()-0.5)*shakeT*0.6);
-    }
-    drawBG();
-    drawGoals();
-    drawSlime(p1);
-    drawSlime(p2);
-    drawBall();
-    drawSparks();
-    drawHUD();
+    if (shakeT>0) ctx.translate((Math.random()-0.5)*shakeT*0.6, (Math.random()-0.5)*shakeT*0.6);
+    drawBG(); drawGoals(); drawSlime(p1); drawSlime(p2); drawBall(); drawSparks(); drawHUD();
     ctx.restore();
-
     requestAnimationFrame(loop);
   }
   loop();
