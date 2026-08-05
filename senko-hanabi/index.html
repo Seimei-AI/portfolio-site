@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>線香花火の夜に</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;min-height:100vh;background:#07070f;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-family:"DotGothic16","MS Gothic",monospace;color:#667}
+  canvas{image-rendering:pixelated;width:min(96vw,960px);max-height:92vh;border:1px solid #223}
+  #hint{font-size:12px;margin-top:8px;letter-spacing:1px}
+</style>
+</head>
+<body>
+<canvas id="cv" width="480" height="270"></canvas>
+<div id="hint">いどう：やじるしキー / WASD　　はなす・すすむ：Z / Enter / Space</div>
+<script>
+"use strict";
+const CV=document.getElementById('cv'), X=CV.getContext('2d');
+const W=480,H=270,T=16,MW=44,MH=28;
+const FONT='12px "DotGothic16","MS Gothic",monospace';
+
+/* ---------------- map ---------------- */
+const map=[];
+for(let y=0;y<MH;y++){map.push(new Array(MW).fill('g'));}
+const set=(x,y,c)=>{if(x>=0&&x<MW&&y>=0&&y<MH)map[y][x]=c;};
+const get=(x,y)=>(x<0||x>=MW||y<0||y>=MH)?'t':map[y][x];
+const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)set(i,j,c);};
+const hash=(x,y)=>{let n=x*374761393+y*668265263;n=(n^(n>>13))*1274126177;return (n^(n>>16))>>>0;};
+// borders
+rect(0,0,MW,2,'t');rect(0,MH-1,MW,1,'t');rect(0,0,2,MH,'t');rect(MW-2,0,2,MH,'t');
+// grandma's house
+rect(4,3,6,3,'h');set(6,5,'d');
+// second house
+rect(5,10,6,2,'h');set(7,11,'d');
+// well
+set(16,10,'W');
+// paths
+for(let y=4;y<=21;y++){set(20,y,'p');set(21,y,'p');}
+for(let x=6;x<=35;x++){set(x,12,'p');}
+// shrine
+rect(31,4,9,5,'S');rect(32,2,5,2,'s');set(34,8,'T');set(35,8,'T');
+set(34,9,'S');set(35,9,'S');set(34,10,'S');set(35,10,'S');set(34,11,'S');set(35,11,'S');
+// flower field
+for(let y=15;y<=18;y++)for(let x=5;x<=13;x++)if((x+y)%2===0)set(x,y,'F');
+// grove (right side)
+for(let y=13;y<=21;y++)for(let x=30;x<=41;x++){if(hash(x,y)%4===0)set(x,y,'t');}
+rect(33,15,6,4,'g'); // clearing
+set(31,13,'g');set(32,13,'g'); // entrance
+// river + bridge + bank
+rect(2,22,40,2,'w');
+set(20,22,'b');set(21,22,'b');set(20,23,'b');set(21,23,'b');
+set(8,25,'r');set(30,25,'r');set(37,24,'r');set(12,24,'F');set(27,25,'F');set(33,24,'F');
+const SOLID='thsfrwWd';
+const solidAt=(px,py)=>SOLID.includes(get(Math.floor(px/T),Math.floor(py/T)));
+
+/* ---------------- state ---------------- */
+const G={state:'title',phase:0,fire:0,greet:{},cs:false,tod:'day',t:0,
+  fade:0,fadeCol:'#000',shake:0,natA:1,sparkler:null,whisperT:0,endSel:0};
+const player={x:7*T+8,y:7*T+8,dir:'down',f:0,ft:0};
+const keys={};
+let dlg=null, particles=[], fireflies=[];
+
+/* ---------------- audio ---------------- */
+let AC=null;
+function ac(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();}catch(e){}return AC;}
+function tone(f,d,type,v,slide){const a=ac();if(!a)return;try{
+  const o=a.createOscillator(),g=a.createGain();o.type=type||'square';
+  o.frequency.setValueAtTime(f,a.currentTime);
+  if(slide)o.frequency.linearRampToValueAtTime(slide,a.currentTime+d);
+  g.gain.setValueAtTime(v||0.03,a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+d);
+  o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+d);}catch(e){}}
+const blip=()=>tone(760,0.04,'square',0.012);
+const chime=()=>{tone(1320,0.12,'triangle',0.05);setTimeout(()=>tone(1760,0.18,'triangle',0.05),90);};
+const bell=()=>{tone(2400,0.5,'triangle',0.04,2350);}; // wind chime
+const droneSnd=()=>{tone(72,1.4,'sawtooth',0.05,55);tone(75,1.4,'sine',0.06,58);};
+const higurashi=()=>{let n=0;const rep=()=>{if(n++>7)return;tone(3900,0.09,'sine',0.028,3500);setTimeout(rep,130+n*14);};rep();};
+
+/* ---------------- dialogue ---------------- */
+function say(lines,onEnd,choice){dlg={lines,i:0,ci:0,onEnd:onEnd||null,choice:choice||null,mode:'text',sel:0};}
+function advance(){
+  if(!dlg)return;
+  if(dlg.mode==='choice'){
+    const c=dlg.choice;dlg=null;blip();c.cb(dlg&&0||c.sel);return;
+  }
+  const line=dlg.lines[dlg.i];
+  if(dlg.ci<line.t.length){dlg.ci=line.t.length;return;}
+  dlg.i++;dlg.ci=0;blip();
+  if(dlg.i>=dlg.lines.length){
+    if(dlg.choice){dlg.mode='choice';dlg.choice.sel=0;return;}
+    const f=dlg.onEnd;dlg=null;if(f)f();
+  }
+}
+function choiceMove(dy){if(dlg&&dlg.mode==='choice'){dlg.choice.sel=(dlg.choice.sel+dy+dlg.choice.opts.length)%dlg.choice.opts.length;blip();}}
+
+/* ---------------- npcs ---------------- */
+const PAL={
+  boy:{hair:'#3b2b20',skin:'#f2c9a0',top:'#4a90d9',bottom:'#3d5a80'},
+  natsume:{hair:'#181822',skin:'#f7e6d4',top:'#f2ede2',bottom:'#e8e2d4',dress:1,long:1,rib:1},
+  baa:{hair:'#cfcfcf',skin:'#e8c39a',top:'#8a5a44',bottom:'#6e4636',dress:1},
+  yoshie:{hair:'#5b4a6b',skin:'#f0c8a0',top:'#9b6b9e',bottom:'#7a5580',dress:1},
+  genji:{hair:'#dddddd',skin:'#e0b890',top:'#5a7a4a',bottom:'#4a5a40'},
+  shota:{hair:'#4a3018',skin:'#f2c9a0',top:'#d95f43',bottom:'#4a6a8a',cap:'#d9a441'}
+};
+function greetCount(){return Object.keys(G.greet).length;}
+const npcs=[
+ {id:'baa',name:'おばあちゃん',pal:PAL.baa,x:8*T,y:6*T+10,vis:()=>G.phase<3||G.phase===5},
+ {id:'yoshie',name:'よしえさん',pal:PAL.yoshie,x:15*T,y:11*T+8,vis:()=>G.phase<3},
+ {id:'genji',name:'げんじいさん',pal:PAL.genji,x:9*T,y:13*T+8,vis:()=>G.phase<3},
+ {id:'shota',name:'しょうた',pal:PAL.shota,x:23*T,y:20*T+8,vis:()=>G.phase<3},
+ {id:'natsume',name:'ナツメ',pal:PAL.natsume,x:35*T,y:7*T+8,vis:()=>G.phase===1||G.phase===2||G.phase===4}
+];
+const npc=id=>npcs.find(n=>n.id===id);
+
+function checkGreets(){
+  if(G.phase===0&&greetCount()>=3){
+    setTimeout(()=>{bell();
+      say([{n:'',t:'──ちりん。\n風もないのに、神社のほうで　風鈴が　鳴った。'}],()=>{G.phase=1;});
+    },300);
+  }
+}
+function talkTo(n){
+  switch(n.id){
+  case 'baa':
+    if(G.phase===0&&!G.greet.baa){G.greet.baa=1;
+      say([{n:n.name,t:'よく来たねえ。ゆっくりして いきな。'},
+           {n:n.name,t:'ほら、これを　持っておいき。ばあちゃんの、たからものだ。'},
+           {n:'',t:'古いお守りを　もらった。\nにぎると、すこし　あたたかい。'},
+           {n:n.name,t:'村のみんなに　あいさつしてきな。せまい村だ、すぐ　おぼえてもらえるよ。'}],checkGreets);}
+    else if(G.phase===5){/* morning handled elsewhere */}
+    else if(G.phase>=1)say([{n:n.name,t:'神社かい？　……あそこには、むかしから　いい風が　吹くんだよ。'}]);
+    else say([{n:n.name,t:'あいさつは　だいじだよ。'}]);
+    break;
+  case 'yoshie':
+    if(!G.greet.yoshie&&G.phase===0){G.greet.yoshie=1;
+      say([{n:n.name,t:'あら、タケばあちゃんとこの子かい。かわいいねえ。'},
+           {n:n.name,t:'……ん？　いま、神社のほうで　だれか　呼んだかい？'}],checkGreets);}
+    else say([{n:n.name,t:'井戸の水は　つめたくて　おいしいよ。'}]);
+    break;
+  case 'genji':
+    if(!G.greet.genji&&G.phase===0){G.greet.genji=1;
+      say([{n:n.name,t:'おう、あいさつが　できて　えらいのう。'},
+           {n:n.name,t:'この村の祭りはな、60年まえに　いちどだけ　中止になったことが　ある。'},
+           {n:n.name,t:'……いや。年よりの　むかしばなしじゃ。わすれてくれ。'}],checkGreets);}
+    else say([{n:n.name,t:'夕方になったら　家にかえるんじゃぞ。'}]);
+    break;
+  case 'shota':
+    if(!G.greet.shota&&G.phase===0){G.greet.shota=1;
+      say([{n:n.name,t:'あそぼうぜ！　……えっ、これから　神社？'},
+           {n:n.name,t:'おれ、あそこ　にがてなんだよな。だれも　いないのに、風鈴が　鳴るんだ。'}],checkGreets);}
+    else say([{n:n.name,t:'川には　入るなよ！　じいちゃんとの　やくそくなんだ。'}]);
+    break;
+  case 'natsume':
+    if(G.phase===1){
+      say([{n:'？？？',t:'……あ。　こっち、気づいた。'},
+           {n:'ナツメ',t:'はじめまして。あたし、ナツメ。夏の、ナツメ。'},
+           {n:'ナツメ',t:'きみ、タケちゃんの……　ううん、なんでもない。'},
+           {n:'ぼく',t:'（タケちゃん……？　おばあちゃんの　名前だ）'},
+           {n:'ナツメ',t:'ねえ、あそぼうよ。もうすぐ　夕方だから、うらの森に　ホタルが　でるの。'},
+           {n:'ナツメ',t:'4ひき　つかまえたら、きみの勝ち。……いくよ、よーい、どん！'}],
+        ()=>{G.phase=2;G.tod='evening';n.x=34*T;n.y=15*T+8;spawnFireflies();higurashi();});
+    }else if(G.phase===2){
+      if(G.fire<4){say([{n:'ナツメ',t:'ホタルは　ひかりの近くを　ゆっくり歩けば　つかまえられるよ。あと'+(4-G.fire)+'ひき！'}]);}
+      else{
+        say([{n:'ナツメ',t:'わあ、4ひきも！　きみ、すじが　いいね。'},
+             {n:'ナツメ',t:'……ねえ。今夜、お祭りが　あるでしょ。'}],
+          ()=>{G.cs=true;G.shake=14;droneSnd();G.whisperT=1.4;
+            setTimeout(()=>{G.cs=false;
+              say([{n:'ナツメ',t:'……ごめんね、こわがらせて。だいじょうぶ。あれはただ、さみしいだけ　なんだ。'},
+                   {n:'ナツメ',t:'今夜、川原で　線香花火をしよう。やくそく。……ぜったいだよ。'},
+                   {n:'',t:'気がつくと、ナツメは　もう　いなかった。\n遠くで、祭りばやしが　聞こえはじめる。'}],
+                ()=>{G.phase=3;G.tod='night';fireflies=[];});
+            },2000);});
+      }
+    }
+    break;
+  }
+}
+
+/* ---------------- fireflies ---------------- */
+function spawnFireflies(){
+  fireflies=[];let tries=0;
+  while(fireflies.length<6&&tries++<200){
+    const tx=31+Math.floor(Math.random()*10),ty=14+Math.floor(Math.random()*7);
+    if(!SOLID.includes(get(tx,ty)))fireflies.push({x:tx*T+8,y:ty*T+8,a:Math.random()*6.28,got:false});
+  }
+}
+
+/* ---------------- finale ---------------- */
+function finale(){
+  G.cs=true;G.phase=4;G.fadeCol='#000';G.fade=1;droneSnd();
+  setTimeout(()=>droneSnd(),900);
+  setTimeout(()=>{
+    say([{n:'こえ',t:'カ　エ　レ　……　カ　エ　レ　……'},
+         {n:'こえ',t:'……さみしい……　さみしいよう……'},
+         {n:'？？？',t:'──もう、いいよ。\nその子は、あたしの　おきゃくさま。'}],()=>{
+      const n=npc('natsume');n.x=22*T,n.y=25*T+8;G.natA=1;
+      player.x=20*T+8;player.y=25*T+8;player.dir='right';
+      G.fade=0;G.tod='night';bell();
+      say([{n:'ナツメ',t:'来てくれたんだ。……やくそく、おぼえてて　くれたんだね。'},
+           {n:'ナツメ',t:'はい、線香花火。火は……　ふふ、あたしが　つけるね。'}],()=>{
+        G.sparkler={x:21*T+8,y:25*T+4};chime();
+        say([{n:'ナツメ',t:'……ねえ。60年まえもね、こうやって　川原で花火をする　やくそくを　してたんだ。タケちゃんと。'},
+             {n:'ナツメ',t:'でも　その年の夏、あたしは　川で……　その、まあ、いろいろ　あって。お祭りも　中止に　なっちゃった。'},
+             {n:'ナツメ',t:'タケちゃん、ずっと　気にしてたみたい。おとなになって、おばあちゃんに　なっても。'},
+             {n:'ナツメ',t:'きみの　ポケットの　お守り。それ、あの夏に　あたしが　タケちゃんに　あげたもの　なんだよ。'},
+             {n:'ぼく',t:'（お守りが、すこし　あたたかい）'},
+             {n:'ナツメ',t:'きみが村に来たとき、すぐ　わかった。ああ、タケちゃんが　やくそくを　とどけに来てくれたんだ、って。'},
+             {n:'ナツメ',t:'こわい声はね、あたしの『さみしい』が　もれてた音。もう、だいじょうぶ。……ほら、火が　きれいだよ。'}],
+          null,
+          {opts:['ありがとう、ナツメ','また、あそぼうね'],cb:(sel)=>{
+            const line=(sel===0)
+              ?{n:'ナツメ',t:'お礼を言うのは　あたしのほう。60年ぶんの『たのしかった』を、きみに　あげる。'}
+              :{n:'ナツメ',t:'ふふ、やくそくは　しないでおく。でも、夏がくるたび　思い出してくれたら、あたしは　そこに　いるよ。'};
+            say([line,
+                 {n:'',t:'線香花火の玉が、ぽとりと　落ちた。'},
+                 {n:'ナツメ',t:'……ああ、たのしかった。\nタケちゃんに　つたえてね。'},
+                 {n:'ナツメ',t:'『ナツメは、ちゃんと　夏のむこうに　帰れたよ』って。'}],()=>{
+              G.sparkler=null;fadeNatsume();
+            });
+          }});
+      });
+    });
+  },2600);
+}
+function fadeNatsume(){
+  const iv=setInterval(()=>{
+    G.natA-=0.02;
+    const n=npc('natsume');
+    particles.push({x:n.x+Math.random()*12-6,y:n.y-Math.random()*16,vx:0,vy:-0.4,life:60,col:'#ffe9a8'});
+    if(G.natA<=0){clearInterval(iv);
+      setTimeout(()=>{G.fadeCol='#fff';G.fade=1;
+        setTimeout(morning,1800);},600);}
+  },50);
+}
+function morning(){
+  G.phase=5;G.tod='morning';G.cs=false;G.sparkler=null;
+  player.x=7*T+8;player.y=7*T+8;player.dir='up';
+  const b=npc('baa');b.x=8*T;b.y=6*T+10;
+  setTimeout(()=>{G.fade=0;
+    setTimeout(()=>{
+      say([{n:'',t:'あさ。セミの声で　目が　さめた。'},
+           {n:'おばあちゃん',t:'おかえり。……ゆうべ、いい夢を見たよ。'},
+           {n:'おばあちゃん',t:'小さいころの友だちと、川原で　花火をする夢だ。'},
+           {n:'おばあちゃん',t:'……その顔。あんた、ナツメに　会ったんだね。'},
+           {n:'おばあちゃん',t:'そうかい。……そうかい。　帰れたかい。'},
+           {n:'',t:'おばあちゃんは、それだけ言って　わらった。'},
+           {n:'',t:'つくえの上のお守りが、朝日を　すいこんで、\nきらりと　ひかった。'}],
+        ()=>{G.fadeCol='#000';G.fade=1;setTimeout(()=>{G.state='end';},1500);});
+    },900);
+  },400);
+}
+
+/* ---------------- input ---------------- */
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
+  if(e.key.startsWith('Arrow')||k===' ')e.preventDefault();
+  ac();
+  keys[k]=true;
+  if(G.state==='title'&&(k==='z'||k==='enter'||k===' ')){
+    G.state='play';blip();
+    setTimeout(()=>{
+      say([{n:'',t:'夏休み。\nぼくは、山あいの村にある　おばあちゃんの家に\nあずけられた。'},
+           {n:'',t:'せみの声。入道雲。しらない　村。\n──まずは、あいさつを　しに行こう。'}]);
+    },400);
+    return;
+  }
+  if(G.state==='end'&&(k==='r'||k==='z'||k==='enter')){location.reload();return;}
+  if(G.state!=='play')return;
+  if(dlg&&dlg.mode==='choice'){
+    if(k==='arrowup'||k==='w')choiceMove(-1);
+    else if(k==='arrowdown'||k==='s')choiceMove(1);
+    else if(k==='z'||k==='enter'||k===' '){const c=dlg.choice,s=c.sel;dlg=null;blip();c.cb(s);}
+    return;
+  }
+  if(k==='z'||k==='enter'||k===' '){
+    if(dlg){advance();return;}
+    if(G.cs)return;
+    // interact
+    let best=null,bd=26;
+    for(const n of npcs){if(!n.vis())continue;
+      const d=Math.hypot(n.x-player.x,n.y-player.y);
+      if(d<bd){bd=d;best=n;}}
+    if(best){player.dir=Math.abs(best.x-player.x)>Math.abs(best.y-player.y)?(best.x>player.x?'right':'left'):(best.y>player.y?'down':'up');talkTo(best);}
+  }
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+CV.addEventListener('pointerdown',()=>{ac();if(G.state==='title'){G.state='play';setTimeout(()=>{say([{n:'',t:'夏休み。\nぼくは、山あいの村にある　おばあちゃんの家に\nあずけられた。'},{n:'',t:'せみの声。入道雲。しらない　村。\n──まずは、あいさつを　しに行こう。'}]);},400);}else if(dlg&&dlg.mode!=='choice')advance();});
+
+/* ---------------- update ---------------- */
+let higT=0,whT=0;
+function update(dt){
+  G.t+=dt;
+  if(G.shake>0)G.shake=Math.max(0,G.shake-dt*18);
+  if(G.whisperT>0)G.whisperT-=dt;
+  // ambient sounds
+  if(G.tod==='evening'){higT-=dt;if(higT<=0){higT=6+Math.random()*4;higurashi();}}
+  if(G.phase===3&&!G.cs){whT-=dt;if(whT<=0){whT=5+Math.random()*4;G.whisperT=1.2;G.shake=5;droneSnd();}}
+  if(G.state!=='play')return;
+  // movement
+  if(!dlg&&!G.cs){
+    let dx=0,dy=0;
+    if(keys['arrowleft']||keys['a'])dx=-1;
+    if(keys['arrowright']||keys['d'])dx=1;
+    if(keys['arrowup']||keys['w'])dy=-1;
+    if(keys['arrowdown']||keys['s'])dy=1;
+    if(dx&&dy){dx*=0.72;dy*=0.72;}
+    const sp=88*dt;
+    if(dx){const nx=player.x+dx*sp;
+      if(!solidAt(nx+(dx>0?4:-4),player.y-2)&&!solidAt(nx+(dx>0?4:-4),player.y+4))player.x=nx;
+      player.dir=dx>0?'right':'left';}
+    if(dy){const ny=player.y+dy*sp;
+      if(!solidAt(player.x-4,ny+(dy>0?4:-2))&&!solidAt(player.x+4,ny+(dy>0?4:-2)))player.y=ny;
+      player.dir=dy>0?'down':'up';}
+    if(dx||dy){player.ft+=dt*8;player.f=Math.floor(player.ft)%2;}else player.f=0;
+    // firefly collect
+    if(G.phase===2){
+      for(const f of fireflies){if(f.got)continue;
+        if(Math.hypot(f.x-player.x,f.y-player.y)<11){f.got=true;G.fire++;chime();
+          for(let i=0;i<6;i++)particles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*1.4,vy:-Math.random()*1.2,life:30,col:'#d8f57a'});}}
+    }
+    // finale trigger
+    if(G.phase===3&&player.y>24*T&&!G.cs)finale();
+  }
+  // fireflies wander
+  for(const f of fireflies){if(f.got)continue;
+    f.a+=(Math.random()-0.5)*0.4;
+    const nx=f.x+Math.cos(f.a)*0.35,ny=f.y+Math.sin(f.a)*0.35;
+    if(nx>30*T&&nx<42*T&&ny>13*T&&ny<21*T&&!solidAt(nx,ny)){f.x=nx;f.y=ny;}else f.a+=1.7;}
+  // sparkler particles
+  if(G.sparkler){
+    for(let i=0;i<3;i++){const a=Math.random()*6.28,s=0.4+Math.random()*1.6;
+      particles.push({x:G.sparkler.x,y:G.sparkler.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-0.2,life:14+Math.random()*16,
+        col:Math.random()<0.5?'#ffd977':'#ff9a4d'});}
+  }
+  // typewriter
+  if(dlg&&dlg.mode==='text'){const line=dlg.lines[dlg.i];
+    if(dlg.ci<line.t.length){dlg.ci+=dt*28;if(Math.floor(dlg.ci)%3===0&&Math.random()<0.4)blip();}}
+  // particles
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=p.col==='#ffe9a8'?-0.01:0.04;p.life--;}
+  particles=particles.filter(p=>p.life>0);
+}
+
+/* ---------------- draw helpers ---------------- */
+function person(x,y,o,f,dir,alpha){
+  const px=Math.round(x)-5,py=Math.round(y)-14;
+  X.globalAlpha=alpha==null?1:alpha;
+  if(o.dress){X.fillStyle=o.bottom;X.fillRect(px+1,py+7,8,5);
+    X.fillStyle='#3a3040';X.fillRect(px+2+(f?1:0),py+12,2,2);X.fillRect(px+6-(f?1:0),py+12,2,2);}
+  else{X.fillStyle=o.bottom;X.fillRect(px+2,py+9,3,4+(f?1:0));X.fillRect(px+6,py+9,3,5-(f?1:0));}
+  X.fillStyle=o.top;X.fillRect(px+1,py+4,8,5);
+  X.fillStyle=o.skin;X.fillRect(px+1,py-1,8,5);
+  X.fillStyle=o.hair;X.fillRect(px+1,py-2,8,2);X.fillRect(px,py-1,2,3);X.fillRect(px+8,py-1,2,3);
+  if(o.long){X.fillRect(px,py-1,2,8);X.fillRect(px+8,py-1,2,8);}
+  if(dir!=='up'){X.fillStyle='#26202a';
+    const ox=dir==='left'?-1:dir==='right'?1:0;
+    X.fillRect(px+3+ox,py+1,1,2);X.fillRect(px+6+ox,py+1,1,2);}
+  if(o.rib){X.fillStyle='#e5484d';X.fillRect(px+7,py-3,2,2);}
+  if(o.cap){X.fillStyle=o.cap;X.fillRect(px,py-3,10,2);X.fillRect(px+2,py-4,6,2);}
+  X.globalAlpha=1;
+}
+function light(x,y,r,col){
+  const g=X.createRadialGradient(x,y,2,x,y,r);
+  g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');
+  X.fillStyle=g;X.fillRect(x-r,y-r,r*2,r*2);
+}
+function wrapText(t,maxw){
+  const out=[];
+  for(const seg of t.split('\n')){
+    let cur='';
+    for(const ch of seg){
+      if(X.measureText(cur+ch).width>maxw){out.push(cur);cur=ch;}
+      else cur+=ch;
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+/* ---------------- draw ---------------- */
+function tileDraw(tx,ty,sx,sy){
+  const c=get(tx,ty),h2=hash(tx,ty);
+  // ground base
+  X.fillStyle=(h2%5===0)?'#6f9c3d':'#7aa943';X.fillRect(sx,sy,T,T);
+  if(h2%7===0){X.fillStyle='#88b850';X.fillRect(sx+h2%12,sy+(h2>>3)%12,2,2);}
+  switch(c){
+  case 'p':X.fillStyle='#c9a86b';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#bb9758';X.fillRect(sx+(h2%10),sy+(h2>>4)%10,3,2);break;
+  case 'S':X.fillStyle='#a9a9b2';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#98989f';X.fillRect(sx,sy+T-2,T,1);X.fillRect(sx+(h2%2)*8,sy+7,8,1);break;
+  case 'w':{X.fillStyle='#39699f';X.fillRect(sx,sy,T,T);
+    const ph=Math.sin(G.t*2+tx*1.7+ty*2.3);
+    X.fillStyle='#4a7cb5';if(ph>0.3)X.fillRect(sx+2,sy+4+((h2>>2)%6),7,1);
+    X.fillStyle='#6fa0d0';if(ph>0.8)X.fillRect(sx+8,sy+10,5,1);break;}
+  case 'b':X.fillStyle='#9a6a3f';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#7d5330';X.fillRect(sx,sy+3,T,1);X.fillRect(sx,sy+8,T,1);X.fillRect(sx,sy+13,T,1);
+    X.fillStyle='#b07c4c';X.fillRect(sx,sy,1,T);X.fillRect(sx+15,sy,1,T);break;
+  case 't':{X.fillStyle='#4c3220';X.fillRect(sx+6,sy+9,4,7);
+    X.fillStyle='#3e7030';X.fillRect(sx+1,sy-2,14,12);
+    X.fillStyle='#4f8a3c';X.fillRect(sx+2,sy-1,12,9);
+    X.fillStyle='#66a34a';X.fillRect(sx+3+(h2%3),sy+(h2>>3)%4,5,3);break;}
+  case 'h':{const roofUp=get(tx,ty-1)!=='h';
+    X.fillStyle='#dcCBa2';X.fillStyle='#dccba2';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#c5b28a';X.fillRect(sx,sy+12,T,1);
+    if(roofUp){X.fillStyle='#8a4a3a';X.fillRect(sx-1,sy-3,T+2,8);
+      X.fillStyle='#a05a46';X.fillRect(sx-1,sy-3,T+2,2);}break;}
+  case 'd':{X.fillStyle='#dccba2';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#6b4a2e';X.fillRect(sx+3,sy+3,10,13);
+    X.fillStyle='#4f351f';X.fillRect(sx+7,sy+3,2,13);break;}
+  case 's':{const up=get(tx,ty-1)!=='s';
+    X.fillStyle='#e8e0d0';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#b04038';if(up){X.fillRect(sx-1,sy-4,T+2,7);X.fillStyle='#c85048';X.fillRect(sx-1,sy-4,T+2,2);}
+    else{X.fillStyle='#c9bfa8';X.fillRect(sx+2,sy+4,3,12);X.fillRect(sx+11,sy+4,3,12);}break;}
+  case 'T':{X.fillStyle='#a9a9b2';X.fillRect(sx,sy,T,T);
+    X.fillStyle='#c03830';X.fillRect(sx+2,sy-14,3,28);X.fillRect(sx+11,sy-14,3,28);
+    X.fillStyle='#a82820';X.fillRect(sx-2,sy-16,20,3);X.fillRect(sx,sy-11,16,2);break;}
+  case 'W':{X.fillStyle='#8d8d96';X.fillRect(sx+1,sy+4,14,11);
+    X.fillStyle='#5a5a64';X.fillRect(sx+3,sy+6,10,7);
+    X.fillStyle='#274a6d';X.fillRect(sx+4,sy+7,8,5);
+    X.fillStyle='#7a5330';X.fillRect(sx+2,sy-4,2,10);X.fillRect(sx+12,sy-4,2,10);
+    X.fillStyle='#8a4a3a';X.fillRect(sx,sy-6,16,3);break;}
+  case 'r':X.fillStyle='#8d8d96';X.fillRect(sx+3,sy+5,10,9);
+    X.fillStyle='#a5a5ae';X.fillRect(sx+4,sy+6,5,3);break;
+  case 'F':{X.fillStyle=(h2%3===0)?'#f2f0e0':(h2%3===1)?'#f5c9d8':'#f5e070';
+    X.fillRect(sx+3,sy+3,3,3);X.fillRect(sx+10,sy+9,3,3);
+    X.fillStyle='#5c8a3c';X.fillRect(sx+4,sy+6,1,4);X.fillRect(sx+11,sy+12,1,3);break;}
+  }
+}
+function draw(){
+  X.setTransform(1,0,0,1,0,0);
+  X.clearRect(0,0,W,H);
+  if(G.state==='title'){drawTitle();return;}
+  if(G.state==='end'){drawEnd();return;}
+  // camera
+  let cx=Math.max(0,Math.min(MW*T-W,player.x-W/2));
+  let cy=Math.max(0,Math.min(MH*T-H,player.y-H/2));
+  const shx=G.shake?(Math.random()-0.5)*G.shake:0, shy=G.shake?(Math.random()-0.5)*G.shake:0;
+  X.setTransform(1,0,0,1,Math.round(-cx+shx),Math.round(-cy+shy));
+  // tiles
+  const x0=Math.floor(cx/T),y0=Math.floor(cy/T);
+  for(let ty=y0-1;ty<=y0+Math.ceil(H/T)+1;ty++)
+    for(let tx=x0;tx<=x0+Math.ceil(W/T);tx++)
+      tileDraw(tx,ty,tx*T,ty*T);
+  // lanterns (festival)
+  if(G.phase>=3&&G.phase<5){
+    for(let y=5;y<=20;y+=3){
+      const lx=(y%2?18:23)*T+8,ly=y*T;
+      X.fillStyle='#b04038';X.fillRect(lx-2,ly-14,4,8);
+      X.fillStyle='#ffb54d';X.fillRect(lx-1,ly-12,2,4);
+      X.fillStyle='#6b4a2e';X.fillRect(lx-1,ly-6,2,6);
+    }
+  }
+  // entities (y-sort)
+  const ents=[];
+  for(const n of npcs)if(n.vis())ents.push({y:n.y,d:()=>person(n.x,n.y,n.pal,Math.floor(G.t*2)%2===0&&n.id==='natsume'&&G.phase===2?1:0,'down',n.id==='natsume'?G.natA:1)});
+  ents.push({y:player.y,d:()=>person(player.x,player.y,PAL.boy,player.f,player.dir)});
+  ents.sort((a,b)=>a.y-b.y);
+  for(const e of ents)e.d();
+  // fireflies
+  for(const f of fireflies){if(f.got)continue;
+    const g=0.6+0.4*Math.sin(G.t*4+f.a*7);
+    X.globalCompositeOperation='lighter';
+    light(f.x,f.y,7,'rgba(200,240,90,'+(0.5*g)+')');
+    X.globalCompositeOperation='source-over';
+    X.fillStyle='#e6ff9a';X.fillRect(f.x-1,f.y-1,2,2);}
+  // particles
+  for(const p of particles){X.globalAlpha=Math.min(1,p.life/16);X.fillStyle=p.col;X.fillRect(p.x-1,p.y-1,2,2);X.globalAlpha=1;}
+  if(G.sparkler){X.fillStyle='#fff2c0';X.fillRect(G.sparkler.x-1,G.sparkler.y-1,2,2);}
+  // time-of-day tint
+  X.setTransform(1,0,0,1,0,0);
+  if(G.tod==='evening'){X.fillStyle='rgba(255,110,40,0.20)';X.fillRect(0,0,W,H);
+    X.fillStyle='rgba(40,10,60,0.12)';X.fillRect(0,0,W,H);}
+  else if(G.tod==='night'){X.fillStyle='rgba(8,12,50,0.48)';X.fillRect(0,0,W,H);}
+  else if(G.tod==='morning'){X.fillStyle='rgba(255,240,180,0.10)';X.fillRect(0,0,W,H);}
+  // lights after tint
+  if(G.tod==='night'){
+    X.setTransform(1,0,0,1,Math.round(-cx+shx),Math.round(-cy+shy));
+    X.globalCompositeOperation='lighter';
+    if(G.phase>=3&&G.phase<5)for(let y=5;y<=20;y+=3){const lx=(y%2?18:23)*T+8;light(lx,y*T-10,26,'rgba(255,150,50,0.30)');}
+    const nn=npc('natsume');
+    if(G.phase===4&&G.natA>0)light(nn.x,nn.y-8,42,'rgba(255,200,120,'+(0.25*G.natA)+')');
+    if(G.sparkler)light(G.sparkler.x,G.sparkler.y,34,'rgba(255,190,90,0.5)');
+    light(player.x,player.y-6,38,'rgba(255,190,110,0.14)');
+    X.globalCompositeOperation='source-over';
+    X.setTransform(1,0,0,1,0,0);
+  }
+  // whisper overlay
+  if(G.whisperT>0){
+    X.fillStyle='rgba(90,0,10,'+(0.16+0.1*Math.sin(G.t*30))+')';X.fillRect(0,0,W,H);
+    X.font=FONT;X.fillStyle='rgba(255,60,60,'+(0.4+0.3*Math.random())+')';
+    const wx=60+((G.t*37)%320),wy=50+((G.t*53)%150);
+    X.fillText(Math.random()<0.5?'……かえれ……':'……こっちへ……',wx,wy);
+  }
+  drawUI();
+  // fade
+  if(G.fade>0){X.fillStyle=G.fadeCol;X.globalAlpha=G.fade;X.fillRect(0,0,W,H);X.globalAlpha=1;}
+}
+function objective(){
+  switch(G.phase){
+  case 0:return '村のひとに　あいさつしよう（'+greetCount()+'/3）';
+  case 1:return '神社に　いってみよう';
+  case 2:return G.fire<4?'うらの森で　ホタルをつかまえよう（'+G.fire+'/4）':'ナツメに　はなそう';
+  case 3:return 'はしをわたって　川原へいこう';
+  default:return '';
+  }
+}
+function drawUI(){
+  X.font=FONT;X.textBaseline='top';
+  const ob=objective();
+  if(ob&&!dlg&&!G.cs){
+    const w=X.measureText('◆ '+ob).width;
+    X.fillStyle='rgba(10,10,25,0.7)';X.fillRect(6,6,w+12,18);
+    X.fillStyle='#ffd77a';X.fillText('◆ ',12,10);
+    X.fillStyle='#fff';X.fillText(ob,12+X.measureText('◆ ').width,10);
+  }
+  if(dlg){
+    const line=dlg.lines[Math.min(dlg.i,dlg.lines.length-1)];
+    const bx=8,bw=W-16,bh=64,by=H-bh-8;
+    X.fillStyle='rgba(8,10,30,0.88)';X.fillRect(bx,by,bw,bh);
+    X.strokeStyle='#aab';X.lineWidth=1;X.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+    let ty=by+8;
+    if(line.n){X.fillStyle='#ffd77a';X.fillText('【'+line.n+'】',bx+10,ty);ty+=16;}
+    X.fillStyle='#fff';
+    const shown=line.t.slice(0,Math.floor(dlg.ci));
+    let yy=ty;
+    for(const l of wrapText(shown,bw-28)){X.fillText(l,bx+12,yy);yy+=15;}
+    if(dlg.mode==='text'&&dlg.ci>=line.t.length&&Math.floor(G.t*2)%2===0){
+      X.fillStyle='#ffd77a';X.fillText('▼',bx+bw-20,by+bh-16);}
+    if(dlg.mode==='choice'){
+      const c=dlg.choice,cw=210,ch=c.opts.length*18+12,cx2=W-cw-14,cy2=by-ch-6;
+      X.fillStyle='rgba(8,10,30,0.92)';X.fillRect(cx2,cy2,cw,ch);
+      X.strokeStyle='#aab';X.strokeRect(cx2+0.5,cy2+0.5,cw-1,ch-1);
+      c.opts.forEach((o,i)=>{
+        X.fillStyle=i===c.sel?'#ffd77a':'#ccd';
+        X.fillText((i===c.sel?'▶ ':'　 ')+o,cx2+10,cy2+8+i*18);});
+    }
+  }
+}
+function drawTitle(){
+  X.fillStyle='#070712';X.fillRect(0,0,W,H);
+  // stars
+  for(let i=0;i<40;i++){const h2=hash(i,7);
+    X.fillStyle='rgba(200,210,255,'+(0.25+0.5*Math.abs(Math.sin(G.t+i)))+')';
+    X.fillRect(h2%W,(h2>>9)%140,1,1);}
+  // sparkler
+  const sx=W/2,sy=H-66;
+  X.strokeStyle='#c9a86b';X.beginPath();X.moveTo(sx,sy-30);X.lineTo(sx,sy);X.stroke();
+  for(let i=0;i<4;i++){const a=Math.random()*6.28,s=0.5+Math.random()*1.8;
+    particles.push({x:sx,y:sy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:10+Math.random()*14,col:Math.random()<0.5?'#ffd977':'#ff9a4d'});}
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.03;p.life--;
+    X.globalAlpha=Math.min(1,p.life/12);X.fillStyle=p.col;X.fillRect(p.x-1,p.y-1,2,2);X.globalAlpha=1;}
+  particles=particles.filter(p=>p.life>0);
+  X.fillStyle='#fff2c0';X.fillRect(sx-1,sy-1,3,3);
+  X.textAlign='center';X.textBaseline='top';
+  X.font='26px "DotGothic16","MS Gothic",monospace';
+  X.fillStyle='#fff';X.fillText('線香花火の夜に',W/2,54);
+  X.font=FONT;X.fillStyle='#9ab';
+  X.fillText('― ある夏の、ちいさな やくそくの話 ―',W/2,92);
+  if(Math.floor(G.t*1.6)%2===0){X.fillStyle='#ffd77a';X.fillText('Z キーで はじめる',W/2,H-34);}
+  X.fillStyle='#556';X.font='10px "DotGothic16","MS Gothic",monospace';
+  X.fillText('制作：愛と生命',W/2,H-16);
+  X.textAlign='left';
+}
+function drawEnd(){
+  X.fillStyle='#070712';X.fillRect(0,0,W,H);
+  X.textAlign='center';X.textBaseline='top';
+  X.font='22px "DotGothic16","MS Gothic",monospace';
+  X.fillStyle='#fff';X.fillText('線香花火の夜に',W/2,80);
+  X.font=FONT;X.fillStyle='#ffd77a';X.fillText('― おしまい ―',W/2,118);
+  X.fillStyle='#9ab';X.fillText('あそんでくれて ありがとう', W/2,150);
+  if(Math.floor(G.t*1.6)%2===0){X.fillStyle='#667';X.fillText('R キーで もういちど',W/2,H-40);}
+  X.textAlign='left';
+}
+
+/* ---------------- loop ---------------- */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  update(dt);draw();
+  requestAnimationFrame(loop);
+}
+X.font=FONT;
+requestAnimationFrame(loop);
+
+// debug hooks
+window.DBG={G,player,npcs,warp:(x,y)=>{player.x=x*T+8;player.y=y*T+8;},say,get map(){return map;},get dlg(){return dlg;},adv:advance,get fireflies(){return fireflies;},update,draw,shot:()=>{draw();return CV.toDataURL('image/png');},step:(n)=>{for(let i=0;i<(n||1);i++)update(1/60);}};
+</script>
+</body>
+</html>
