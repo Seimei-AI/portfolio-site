@@ -2,19 +2,39 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>線香花火の夜に</title>
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;min-height:100vh;background:#07070f;display:flex;flex-direction:column;
     align-items:center;justify-content:center;font-family:"DotGothic16","MS Gothic",monospace;color:#667}
-  canvas{image-rendering:pixelated;width:min(96vw,960px);max-height:92vh;border:1px solid #223}
+  canvas{image-rendering:pixelated;width:min(96vw,960px);max-height:92vh;border:1px solid #223;touch-action:none}
   #hint{font-size:12px;margin-top:8px;letter-spacing:1px}
+  #mute{margin-top:6px;background:none;border:1px solid #334;color:#889;padding:3px 12px;cursor:pointer;font-family:inherit;font-size:12px}
+  #ctrl{display:none}
+  body.touch #ctrl{display:block}
+  body.touch #hint{display:none}
+  #ctrl button{position:fixed;width:58px;height:58px;border-radius:50%;border:1px solid #556;
+    background:rgba(30,34,60,.5);color:#cde;font-size:20px;z-index:10;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #bU{left:70px;bottom:126px}
+  #bL{left:10px;bottom:66px}
+  #bR{left:130px;bottom:66px}
+  #bD{left:70px;bottom:8px}
+  #bA{right:18px;bottom:52px;width:76px;height:76px;font-size:24px;background:rgba(140,50,60,.5)}
 </style>
 </head>
 <body>
 <canvas id="cv" width="480" height="270"></canvas>
-<div id="hint">いどう：やじるしキー / WASD　　はなす・すすむ：Z / Enter / Space</div>
+<div id="hint">いどう：やじるしキー / WASD　　はなす・すすむ：Z / Enter / Space　　M：ミュート</div>
+<button id="mute" type="button">♪ おと：ON</button>
+<div id="ctrl">
+  <button id="bU" type="button" data-k="arrowup">▲</button>
+  <button id="bL" type="button" data-k="arrowleft">◀</button>
+  <button id="bR" type="button" data-k="arrowright">▶</button>
+  <button id="bD" type="button" data-k="arrowdown">▼</button>
+  <button id="bA" type="button">Ｚ</button>
+</div>
 <script>
 "use strict";
 const CV=document.getElementById('cv'), X=CV.getContext('2d');
@@ -63,9 +83,10 @@ const keys={};
 let dlg=null, particles=[], fireflies=[];
 
 /* ---------------- audio ---------------- */
-let AC=null;
+let AC=null,muted=false;
 function ac(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();}catch(e){}return AC;}
-function tone(f,d,type,v,slide){const a=ac();if(!a)return;try{
+function toggleMute(){muted=!muted;document.getElementById('mute').textContent='♪ おと：'+(muted?'OFF':'ON');}
+function tone(f,d,type,v,slide){const a=ac();if(!a||muted)return;try{
   const o=a.createOscillator(),g=a.createGain();o.type=type||'square';
   o.frequency.setValueAtTime(f,a.currentTime);
   if(slide)o.frequency.linearRampToValueAtTime(slide,a.currentTime+d);
@@ -77,6 +98,73 @@ const chime=()=>{tone(1320,0.12,'triangle',0.05);setTimeout(()=>tone(1760,0.18,'
 const bell=()=>{tone(2400,0.5,'triangle',0.04,2350);}; // wind chime
 const droneSnd=()=>{tone(72,1.4,'sawtooth',0.05,55);tone(75,1.4,'sine',0.06,58);};
 const higurashi=()=>{let n=0;const rep=()=>{if(n++>7)return;tone(3900,0.09,'sine',0.028,3500);setTimeout(rep,130+n*14);};rep();};
+
+/* ---------------- BGM (chiptune sequencer) ---------------- */
+const HIRU_L=[64,0,67,0,69,0,67,64,62,64,0,0,60,0,62,64,67,0,69,0,72,0,69,67,64,0,62,0,60,0,0,0];
+const HIRU_B=[48,0,52,0,45,0,52,0,41,0,48,0,43,0,47,0,48,0,52,0,45,0,52,0,41,0,43,0,48,0,0,0];
+const SONGS={
+ hiru:{bpm:104,tracks:[
+  {type:'square',vol:0.022,sus:1.6,notes:HIRU_L},
+  {type:'triangle',vol:0.05,sus:3.2,notes:HIRU_B}]},
+ asa:{bpm:84,tracks:[
+  {type:'triangle',vol:0.035,sus:1.8,notes:HIRU_L},
+  {type:'sine',vol:0.05,sus:3.2,notes:HIRU_B}]},
+ yuu:{bpm:84,tracks:[
+  {type:'triangle',vol:0.04,sus:2.2,notes:[69,0,0,72,71,0,69,0,67,0,64,0,62,0,64,0,60,0,0,64,67,0,69,0,71,0,72,0,69,0,0,0]},
+  {type:'sine',vol:0.055,sus:5,notes:[45,0,0,0,0,0,0,0,41,0,0,0,0,0,0,0,36,0,0,0,0,0,0,0,43,0,0,0,0,0,0,0]}]},
+ matsuri:{bpm:126,tracks:[
+  {type:'square',vol:0.02,sus:1.4,notes:[76,0,77,76,81,0,0,76,77,0,81,83,81,77,76,0,81,0,83,84,83,81,77,0,77,76,72,0,76,0,0,0]},
+  {type:'triangle',vol:0.05,sus:2.5,notes:[40,0,0,0,40,0,0,0,40,0,0,0,40,0,0,0,45,0,0,0,45,0,0,0,43,0,0,0,40,0,0,0]},
+  {type:'noise',vol:0.10,notes:[2,0,1,0,2,0,1,1,2,0,1,0,2,1,1,0]}]},
+ hanabi:{bpm:72,tracks:[
+  {type:'triangle',vol:0.038,sus:2.6,notes:[72,76,79,0,83,79,76,0,69,72,76,0,79,76,72,0,65,69,72,0,76,72,69,0,67,71,74,0,79,74,71,0]},
+  {type:'sine',vol:0.045,sus:6,notes:[48,0,0,0,0,0,0,0,45,0,0,0,0,0,0,0,41,0,0,0,0,0,0,0,43,0,0,0,0,0,0,0]}]}
+};
+function noteAt(t,midi,dur,type,vol){
+  const a=AC;if(!a||muted)return;
+  try{const o=a.createOscillator(),g=a.createGain();
+  o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);
+  g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(vol,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+0.03);}catch(e){}
+}
+let noiseBuf=null;
+function noiseHit(t,kind,vol){
+  const a=AC;if(!a||muted)return;
+  try{if(!noiseBuf){noiseBuf=a.createBuffer(1,a.sampleRate*0.2|0,a.sampleRate);
+    const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
+  const s=a.createBufferSource();s.buffer=noiseBuf;
+  const f=a.createBiquadFilter();f.type=kind===2?'lowpass':'highpass';f.frequency.value=kind===2?220:6000;
+  const g=a.createGain();const dur=kind===2?0.16:0.05;
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f);f.connect(g);g.connect(a.destination);s.start(t);s.stop(t+dur+0.02);}catch(e){}
+}
+const bgm={cur:undefined,step:0,next:0};
+function desiredSong(){
+  if(G.state==='end')return 'hanabi';
+  if(G.state!=='play')return null;
+  if(G.phase===4)return G.sparkler?'hanabi':null;
+  if(G.phase===5)return 'asa';
+  if(G.cs)return null;
+  if(G.tod==='evening')return 'yuu';
+  if(G.tod==='night')return 'matsuri';
+  return 'hiru';
+}
+setInterval(()=>{try{
+  const a=AC;if(!a)return;
+  const want=desiredSong();
+  if(want!==bgm.cur){bgm.cur=want;bgm.step=0;bgm.next=a.currentTime+0.1;}
+  if(!want||muted){bgm.next=a.currentTime+0.1;return;}
+  const s=SONGS[want],spb=30/s.bpm;
+  while(bgm.next<a.currentTime+0.18){
+    for(const tr of s.tracks){
+      const n=tr.notes[bgm.step%tr.notes.length];
+      if(n){if(tr.type==='noise')noiseHit(bgm.next,n,tr.vol);
+        else noteAt(bgm.next,n,spb*(tr.sus||1.8),tr.type,tr.vol);}
+    }
+    bgm.step++;bgm.next+=spb;
+  }
+}catch(e){}},40);
 
 /* ---------------- dialogue ---------------- */
 function say(lines,onEnd,choice){dlg={lines,i:0,ci:0,onEnd:onEnd||null,choice:choice||null,mode:'text',sel:0};}
@@ -254,41 +342,71 @@ function morning(){
 }
 
 /* ---------------- input ---------------- */
+function startGame(){
+  G.state='play';blip();
+  setTimeout(()=>{
+    say([{n:'',t:'夏休み。\nぼくは、山あいの村にある　おばあちゃんの家に\nあずけられた。'},
+         {n:'',t:'せみの声。入道雲。しらない　村。\n──まずは、あいさつを　しに行こう。'}]);
+  },400);
+}
+function confirmChoice(){const c=dlg.choice,s=c.sel;dlg=null;blip();c.cb(s);}
+function doAction(){
+  if(G.state==='title'){startGame();return;}
+  if(G.state==='end'){location.reload();return;}
+  if(dlg){if(dlg.mode==='choice')confirmChoice();else advance();return;}
+  if(G.cs)return;
+  // interact
+  let best=null,bd=26;
+  for(const n of npcs){if(!n.vis())continue;
+    const d=Math.hypot(n.x-player.x,n.y-player.y);
+    if(d<bd){bd=d;best=n;}}
+  if(best){player.dir=Math.abs(best.x-player.x)>Math.abs(best.y-player.y)?(best.x>player.x?'right':'left'):(best.y>player.y?'down':'up');talkTo(best);}
+}
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
-  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
   if(e.key.startsWith('Arrow')||k===' ')e.preventDefault();
   ac();
   keys[k]=true;
-  if(G.state==='title'&&(k==='z'||k==='enter'||k===' ')){
-    G.state='play';blip();
-    setTimeout(()=>{
-      say([{n:'',t:'夏休み。\nぼくは、山あいの村にある　おばあちゃんの家に\nあずけられた。'},
-           {n:'',t:'せみの声。入道雲。しらない　村。\n──まずは、あいさつを　しに行こう。'}]);
-    },400);
-    return;
-  }
-  if(G.state==='end'&&(k==='r'||k==='z'||k==='enter')){location.reload();return;}
-  if(G.state!=='play')return;
+  if(k==='m'){toggleMute();return;}
   if(dlg&&dlg.mode==='choice'){
-    if(k==='arrowup'||k==='w')choiceMove(-1);
-    else if(k==='arrowdown'||k==='s')choiceMove(1);
-    else if(k==='z'||k==='enter'||k===' '){const c=dlg.choice,s=c.sel;dlg=null;blip();c.cb(s);}
-    return;
+    if(k==='arrowup'||k==='w'){choiceMove(-1);return;}
+    if(k==='arrowdown'||k==='s'){choiceMove(1);return;}
   }
-  if(k==='z'||k==='enter'||k===' '){
-    if(dlg){advance();return;}
-    if(G.cs)return;
-    // interact
-    let best=null,bd=26;
-    for(const n of npcs){if(!n.vis())continue;
-      const d=Math.hypot(n.x-player.x,n.y-player.y);
-      if(d<bd){bd=d;best=n;}}
-    if(best){player.dir=Math.abs(best.x-player.x)>Math.abs(best.y-player.y)?(best.x>player.x?'right':'left'):(best.y>player.y?'down':'up');talkTo(best);}
-  }
+  if(k==='z'||k==='enter'||k===' '){doAction();return;}
+  if(G.state==='end'&&k==='r')location.reload();
 });
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
-CV.addEventListener('pointerdown',()=>{ac();if(G.state==='title'){G.state='play';setTimeout(()=>{say([{n:'',t:'夏休み。\nぼくは、山あいの村にある　おばあちゃんの家に\nあずけられた。'},{n:'',t:'せみの声。入道雲。しらない　村。\n──まずは、あいさつを　しに行こう。'}]);},400);}else if(dlg&&dlg.mode!=='choice')advance();});
+// canvas tap / click
+CV.addEventListener('pointerdown',e=>{
+  e.preventDefault();ac();
+  if(dlg&&dlg.mode==='choice'){
+    const r=CV.getBoundingClientRect();
+    const x=(e.clientX-r.left)*W/r.width, y=(e.clientY-r.top)*H/r.height;
+    const c=dlg.choice,cw=210,ch=c.opts.length*18+12,cx2=W-cw-14,by=H-64-8,cy2=by-ch-6;
+    if(x>=cx2&&x<=cx2+cw&&y>=cy2&&y<=cy2+ch){
+      const i=Math.floor((y-cy2-8)/18);
+      if(i>=0&&i<c.opts.length){if(i===c.sel)confirmChoice();else{c.sel=i;blip();}}
+    }
+    return;
+  }
+  doAction();
+});
+// touch controls
+if(matchMedia('(pointer:coarse)').matches||'ontouchstart' in window)document.body.classList.add('touch');
+for(const b of document.querySelectorAll('#ctrl [data-k]')){
+  const k=b.dataset.k;
+  const dn=e=>{e.preventDefault();ac();
+    if(dlg&&dlg.mode==='choice'){if(k==='arrowup')choiceMove(-1);else if(k==='arrowdown')choiceMove(1);return;}
+    keys[k]=true;};
+  const up=e=>{e.preventDefault();keys[k]=false;};
+  b.addEventListener('pointerdown',dn);b.addEventListener('pointerup',up);
+  b.addEventListener('pointercancel',up);b.addEventListener('pointerleave',up);
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+}
+const bA=document.getElementById('bA');
+bA.addEventListener('pointerdown',e=>{e.preventDefault();ac();doAction();});
+bA.addEventListener('contextmenu',e=>e.preventDefault());
+document.getElementById('mute').addEventListener('click',()=>{ac();toggleMute();});
 
 /* ---------------- update ---------------- */
 let higT=0,whT=0;
