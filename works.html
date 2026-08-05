@@ -54,6 +54,7 @@
             HTML / CSS / JavaScriptの1ファイルで実装。プレイ時間は約10分。
             少し不思議で、最後に心が温まる夏のお話です（スマホのタッチ操作にも対応）。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="senko-hanabi" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -75,6 +76,7 @@
             Canvasによる描画とボールの物理挙動、当たり判定、得点・勝敗判定、CPU対戦AIまでを1ファイルで実装。
             スマホのタッチ操作にも対応しています。カードをクリックすると実際に遊べます（スマホ／PC対応・1人でもCPUと対戦可・5点先取）。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="slime-soccer" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -95,6 +97,7 @@
             HTML / CSS / JavaScriptの基礎を学びながら制作した、練習用の自己紹介サイトです。
             写真の掲載、スマホ対応のレイアウト、ボタンクリックで反応するJavaScriptを実装しています。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="jikoshoukai-page" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -116,6 +119,7 @@
             課題提起→サービス紹介→お客様の声→申込導線という、LPの基本構成を実装しています。
             ※架空のクライアントを想定したポートフォリオ用の制作物です。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="mock-lp-toshi-school" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -136,6 +140,7 @@
             実体験に基づく検証記事を蓄積していく形式のコンテンツサイトです。
             記事一覧ページと個別記事ページの構成、継続更新を前提としたサイト設計の実例です。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="apex-gear-blog" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -156,6 +161,7 @@
             EDINETの有価証券報告書をAIで要約・分析し、個人投資家向けに企業分析コンテンツとして提供する情報サイトです。
             現在は掲載データがすべて架空のデザインサンプル段階で、実データ連携に向けて構築を進めています。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="yomitoku-kabushiki" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -176,6 +182,7 @@
             Amazonの購入者レビューを星5から星1まで読み込み、日用品・消耗品を正直に比較するメディアサイトです。
             低評価レビューの分析を軸にした編集方針、独自評価軸での比較表、SEO設計（構造化データ・sitemap）まで含めて設計・運営しています。
           </p>
+          <div class="like-row"><button type="button" class="like-btn" data-key="kuraberu-note" aria-label="この作品にいいね">&#9829; <span class="like-count">…</span></button></div>
         </div>
       </a>
 
@@ -186,5 +193,35 @@
     <p>&copy; 2026 Seimei Abe</p>
   </footer>
 
+
+  <script>
+  (function(){
+    var API='https://abacus.jasoncameron.dev';
+    var NS='seimei-portfolio-site';
+    function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+    function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+    document.querySelectorAll('.like-btn').forEach(function(btn){
+      var key=btn.dataset.key;
+      var cnt=btn.querySelector('.like-count');
+      var storeKey='liked-'+key;
+      if(lsGet(storeKey))btn.classList.add('liked');
+      fetch(API+'/get/'+NS+'/'+key)
+        .then(function(r){return r.ok?r.json():{value:0};})
+        .then(function(d){cnt.textContent=d.value;})
+        .catch(function(){cnt.textContent='0';});
+      btn.addEventListener('click',function(e){
+        e.preventDefault();e.stopPropagation();
+        if(lsGet(storeKey))return;
+        lsSet(storeKey,'1');
+        btn.classList.add('liked');btn.classList.add('pop');
+        cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+        fetch(API+'/hit/'+NS+'/'+key)
+          .then(function(r){return r.json();})
+          .then(function(d){cnt.textContent=d.value;})
+          .catch(function(){});
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

@@ -578,3 +578,55 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* いいねボタン */
+.like-row {
+  margin-top: 12px;
+}
+
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid #cfd8e0;
+  background: #fff;
+  color: #667;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.like-btn:hover {
+  transform: scale(1.07);
+  border-color: #7fd1b9;
+  color: #2c8c72;
+}
+
+.like-btn.liked {
+  background: #ffe9f0;
+  border-color: #ff9ebc;
+  color: #e0447a;
+}
+
+.like-btn.liked:hover {
+  transform: none;
+  border-color: #ff9ebc;
+  color: #e0447a;
+}
+
+.like-btn .like-count {
+  font-weight: bold;
+}
+
+@keyframes likePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.like-btn.pop {
+  animation: likePop 0.3s ease;
+}
