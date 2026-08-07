@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NEON BEAT - リズムゲーム</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    height:100%; background:#07070f; overflow:hidden;
+    font-family:"Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    -webkit-user-select:none; user-select:none;
+    touch-action:none;
+  }
+  #wrap {
+    position:relative; height:100%; display:flex;
+    align-items:center; justify-content:center;
+  }
+  canvas {
+    display:block; background:#0d0d1a;
+    box-shadow:0 0 60px rgba(90,80,255,.25);
+    touch-action:none;
+  }
+  .overlay {
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px;
+    background:rgba(7,7,15,.82); color:#eee; text-align:center;
+    z-index:10;
+  }
+  .hidden { display:none; }
+  h1 {
+    font-size:min(11vw, 56px); letter-spacing:.12em; font-weight:800;
+    background:linear-gradient(90deg,#ff5c8a,#ffc94d,#4dd2ff,#9dff4d);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 18px rgba(120,120,255,.5));
+  }
+  .sub { color:#9aa; font-size:14px; line-height:1.8; }
+  .btn {
+    font-size:18px; font-weight:700; letter-spacing:.08em;
+    padding:14px 46px; border-radius:999px; border:2px solid;
+    background:transparent; color:#fff; cursor:pointer;
+    transition:transform .1s, box-shadow .1s;
+  }
+  .btn:hover { transform:scale(1.06); }
+  .btn:active { transform:scale(.97); }
+  .easy   { border-color:#4dd2ff; box-shadow:0 0 14px rgba(77,210,255,.35); }
+  .normal { border-color:#ffc94d; box-shadow:0 0 14px rgba(255,201,77,.35); }
+  .hard   { border-color:#ff5c8a; box-shadow:0 0 14px rgba(255,92,138,.35); }
+  .ghost  { border-color:#667; color:#aab; font-size:15px; padding:10px 34px; }
+  #songSel { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; max-width:92%; }
+  .songBtn {
+    display:flex; flex-direction:column; gap:4px; align-items:center;
+    padding:12px 16px; border-radius:12px; cursor:pointer;
+    border:2px solid #445; background:rgba(255,255,255,.04); color:#cdd;
+    font-size:14px; font-weight:700; transition:transform .1s;
+  }
+  .songBtn span { font-size:11px; font-weight:400; color:#89a; }
+  .songBtn:hover { transform:scale(1.04); }
+  .songBtn.sel {
+    border-color:#8f8fff; color:#fff;
+    box-shadow:0 0 16px rgba(143,143,255,.45);
+    background:rgba(143,143,255,.10);
+  }
+  #resultCard {
+    background:rgba(20,20,38,.95); border:1px solid #334;
+    border-radius:18px; padding:34px 46px; min-width:280px;
+    box-shadow:0 0 40px rgba(90,80,255,.3);
+  }
+  #rank {
+    font-size:84px; font-weight:900; line-height:1;
+    filter:drop-shadow(0 0 22px currentColor);
+  }
+  .stat { display:flex; justify-content:space-between; gap:40px;
+    font-size:15px; color:#bcd; padding:3px 0; }
+  .stat b { color:#fff; }
+  #resultTitle { font-size:20px; color:#ffc94d; letter-spacing:.2em; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+
+  <div id="menu" class="overlay">
+    <h1>NEON BEAT</h1>
+    <div class="sub">
+      落ちてくるノーツをラインで キャッチ！<br>
+      キーボード：<b>D F J K</b> ／ スマホ：レーンをタップ<br>
+      曲をえらんで、難易度ボタンでスタート🎵
+    </div>
+    <div id="songSel">
+      <button class="songBtn sel" data-song="0"><b>ネオンスター</b><span>BPM128・キラキラポップ</span></button>
+      <button class="songBtn" data-song="1"><b>サイバーチェイス</b><span>BPM150・疾走マイナー</span></button>
+      <button class="songBtn" data-song="2"><b>ほしぞらメモリー</b><span>BPM104・ゆったりチル</span></button>
+    </div>
+    <button class="btn easy"   data-diff="0">かんたん</button>
+    <button class="btn normal" data-diff="1">ふつう</button>
+    <button class="btn hard"   data-diff="2">むずかしい</button>
+  </div>
+
+  <div id="result" class="overlay hidden">
+    <div id="resultCard">
+      <div id="resultTitle">RESULT</div>
+      <div id="rank">S</div>
+      <div class="stat"><span>スコア</span><b id="rScore">0</b></div>
+      <div class="stat"><span>最大コンボ</span><b id="rCombo">0</b></div>
+      <div class="stat"><span>PERFECT</span><b id="rPerfect">0</b></div>
+      <div class="stat"><span>GOOD</span><b id="rGood">0</b></div>
+      <div class="stat"><span>MISS</span><b id="rMiss">0</b></div>
+      <div class="stat"><span>精度</span><b id="rAcc">0%</b></div>
+    </div>
+    <button class="btn normal" id="retryBtn">もういちど</button>
+    <button class="btn ghost" id="menuBtn">難易度をえらぶ</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   NEON BEAT — 4レーン落下型リズムゲーム（1ファイル完結）
+   音楽：Web Audio 自作チップチューン（BPM128 / 32小節 = 60秒）
+   ============================================================ */
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const FIELD_W = 480, PANEL_W = 170;   // 左：プレイフィールド／右：ダンサーゾーン
+const W = FIELD_W + PANEL_W, H = 720;
+
+function fitCanvas(){
+  const scale = Math.min(innerWidth / W, innerHeight / H);
+  cv.width = W; cv.height = H;
+  cv.style.width  = (W * scale) + "px";
+  cv.style.height = (H * scale) + "px";
+}
+fitCanvas();
+addEventListener("resize", fitCanvas);
+
+/* ---------------- 定数 ---------------- */
+const LANES = 4;
+const LANE_COLORS = ["#ff5c8a", "#ffc94d", "#4dd2ff", "#9dff4d"];
+const KEYS = ["KeyD", "KeyF", "KeyJ", "KeyK"];
+const KEY_LABELS = ["D", "F", "J", "K"];
+const HIT_Y = H - 130;
+const LANE_W = FIELD_W / LANES;
+
+// テンポ・曲の長さは選択中の曲から設定される（SONGS 定義の下を参照）
+
+const DIFFS = [
+  { name:"かんたん",   approach:1.7, steps:[0,4] },
+  { name:"ふつう",     approach:1.35, steps:[0,2,4,6] },
+  { name:"むずかしい", approach:1.05, steps:[0,1,2,3,4,5,6,7] },
+];
+
+const WIN_PERFECT = 0.07, WIN_GOOD = 0.15;
+
+/* ---------------- 楽曲データ ----------------
+   各曲：4コード進行のループ。メロディは8分音符×8ステップ／小節（0は休符）。
+   melA/melB は4小節ごとに交互に使われる。最初の2小節はイントロ（ドラムのみ）、
+   最後の2小節は ending を鳴らす。 */
+const SONGS = [
+  {
+    title:"ネオンスター", subtitle:"キラキラポップ", bpm:128, measures:32,
+    roots:[36, 43, 45, 41],                    // C G Am F（王道進行）
+    melA:[
+      [72, 0, 76, 74, 72, 0, 79, 0],
+      [79, 0, 74, 76, 74, 0, 71, 0],
+      [69, 0, 72, 74, 76, 0, 72, 0],
+      [77, 0, 76, 74, 72, 0, 74, 76],
+    ],
+    melB:[
+      [72, 74, 76, 0, 79, 76, 74, 72],
+      [74, 0, 71, 0, 74, 76, 79, 0],
+      [81, 0, 79, 76, 74, 76, 72, 0],
+      [77, 76, 74, 72, 74, 0, 72, 0],
+    ],
+    ending:[ [72,0,0,0,79,0,0,0], [72,0,0,0,0,0,0,0] ],
+    lead:{ type:"square",   gain:0.13, dur:0.24 },
+    bass:{ type:"triangle", gain:0.16, style:"octave" },
+    drums:"pop",
+  },
+  {
+    title:"サイバーチェイス", subtitle:"疾走マイナー", bpm:150, measures:36,
+    roots:[33, 41, 36, 43],                    // Am F C G（小室進行）
+    melA:[
+      [76, 0, 76, 74, 72, 0, 69, 0],
+      [77, 0, 77, 76, 74, 0, 72, 0],
+      [76, 0, 79, 0, 76, 74, 72, 0],
+      [74, 76, 74, 72, 71, 0, 74, 0],
+    ],
+    melB:[
+      [81, 0, 79, 77, 76, 0, 72, 74],
+      [77, 76, 74, 0, 77, 0, 81, 0],
+      [79, 0, 76, 0, 72, 74, 76, 0],
+      [71, 72, 74, 76, 79, 0, 74, 72],
+    ],
+    ending:[ [69,0,0,0,76,0,0,0], [69,0,0,0,0,0,0,0] ],
+    lead:{ type:"sawtooth", gain:0.10, dur:0.20 },
+    bass:{ type:"square",   gain:0.10, style:"straight" },
+    drums:"drive",
+  },
+  {
+    title:"ほしぞらメモリー", subtitle:"ゆったりチル", bpm:104, measures:28,
+    roots:[41, 43, 40, 45],                    // F G Em Am（星空進行）
+    melA:[
+      [69, 0, 0, 72, 0, 0, 74, 0],
+      [74, 0, 0, 76, 0, 0, 71, 0],
+      [71, 0, 0, 74, 0, 76, 0, 0],
+      [76, 0, 74, 0, 72, 0, 69, 0],
+    ],
+    melB:[
+      [77, 0, 76, 0, 74, 0, 72, 0],
+      [74, 0, 76, 0, 79, 0, 74, 0],
+      [79, 0, 0, 76, 0, 74, 71, 0],
+      [72, 0, 74, 0, 76, 0, 72, 0],
+    ],
+    ending:[ [77,0,0,0,76,0,0,0], [72,0,0,0,0,0,0,0] ],
+    lead:{ type:"triangle", gain:0.17, dur:0.34 },
+    bass:{ type:"triangle", gain:0.15, style:"half" },
+    drums:"chill",
+  },
+];
+
+let songIdx = 0;
+let curSong = SONGS[0];
+let SPB = 60 / curSong.bpm;                    // 1拍の秒数
+let SONG_LEN = curSong.measures * 4 * SPB;
+
+// 小節ごとのメロディを返す
+function melodyOf(measure){
+  const s = curSong;
+  if (measure < 2) return null;                          // イントロ
+  if (measure >= s.measures - 2)
+    return s.ending[measure - (s.measures - 2)];         // エンディング
+  const i = measure - 2;
+  return (Math.floor(i / 4) % 2 === 0 ? s.melA : s.melB)[i % 4];
+}
+function midiToFreq(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+function laneOf(midi){
+  if (midi < 72) return 0;
+  if (midi < 75) return 1;
+  if (midi < 78) return 2;
+  return 3;
+}
+
+/* ---------------- オーディオ ---------------- */
+let ac = null, master = null, noiseBuf = null;
+
+function initAudio(){
+  if (ac) return;
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  master = ac.createGain();
+  master.gain.value = 0.5;
+  master.connect(ac.destination);
+  // ノイズバッファ（ハイハット・スネア用）
+  const len = ac.sampleRate * 0.3;
+  noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+}
+
+function playKick(t){
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+  g.gain.setValueAtTime(0.5, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.15);
+}
+function playNoise(t, dur, gain, freq){
+  const s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+  s.buffer = noiseBuf;
+  f.type = "highpass"; f.frequency.value = freq;
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+function playTone(t, freq, dur, gain, type){
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function playHitSfx(lane){
+  if (!ac) return;
+  const t = ac.currentTime;
+  playTone(t, 900 + lane * 180, 0.07, 0.12, "square");
+}
+
+/* 音楽イベントの事前生成（時刻はスタートからの相対秒） */
+function buildMusicEvents(){
+  const s = curSong;
+  const ev = [];
+  for (let m = 0; m < s.measures; m++){
+    const base = m * 4 * SPB;
+    const chord = (m < 2 || m >= s.measures - 2) ? 0 : (m - 2) % 4;
+    // ドラム（曲ごとにパターンを変える）
+    for (let beat = 0; beat < 4; beat++){
+      const bt = base + beat * SPB;
+      if (s.drums === "chill"){
+        if (beat === 0 || beat === 2) ev.push({ t: bt, fn: playKick });
+        if (beat === 2) ev.push({ t: bt, fn: (tt)=>playNoise(tt, 0.10, 0.10, 1800) });
+        ev.push({ t: bt + SPB / 2, fn: (tt)=>playNoise(tt, 0.04, 0.06, 7000) });
+      } else {
+        ev.push({ t: bt, fn: playKick });                                // 4つ打ち
+        if (beat === 1 || beat === 3)
+          ev.push({ t: bt, fn: (tt)=>playNoise(tt, 0.12, 0.16, 1800) }); // スネア
+        if (s.drums === "drive")
+          ev.push({ t: bt, fn: (tt)=>playNoise(tt, 0.03, 0.07, 8000) }); // 表ハットも追加
+        ev.push({ t: bt + SPB / 2, fn: (tt)=>playNoise(tt, 0.05, 0.10, 6000) }); // 裏ハット
+      }
+    }
+    // ベース
+    const root = s.roots[chord];
+    if (s.bass.style === "half"){                        // 2分音符でゆったり
+      for (const st of [0, 4])
+        ev.push({ t: base + st * SPB / 2,
+                  fn: (tt)=>playTone(tt, midiToFreq(root), 0.5, s.bass.gain, s.bass.type) });
+    } else {                                             // 8分で刻む
+      for (let st = 0; st < 8; st++){
+        const midi = (s.bass.style === "octave" && st % 2) ? root + 12 : root;
+        ev.push({ t: base + st * SPB / 2,
+                  fn: (tt)=>playTone(tt, midiToFreq(midi), 0.18, s.bass.gain, s.bass.type) });
+      }
+    }
+    // メロディ
+    const mel = melodyOf(m);
+    if (mel){
+      for (let st = 0; st < 8; st++){
+        if (!mel[st]) continue;
+        const f = midiToFreq(mel[st]);
+        ev.push({ t: base + st * SPB / 2,
+                  fn: (tt)=>playTone(tt, f, s.lead.dur, s.lead.gain, s.lead.type) });
+      }
+    }
+  }
+  ev.sort((a, b) => a.t - b.t);
+  return ev;
+}
+
+/* ---------------- 譜面生成 ---------------- */
+function buildChart(diffIdx){
+  const allow = DIFFS[diffIdx].steps;
+  const notes = [];
+  for (let m = 2; m < curSong.measures; m++){
+    const mel = melodyOf(m);
+    if (!mel) continue;
+    for (let s = 0; s < 8; s++){
+      if (!mel[s]) continue;
+      if (!allow.includes(s)) continue;
+      notes.push({
+        time: (m * 4 + s * 0.5) * SPB,
+        lane: laneOf(mel[s]),
+        hit: false, missed: false,
+      });
+    }
+  }
+  return notes;
+}
+
+/* ---------------- ゲーム状態 ---------------- */
+let state = "menu"; // menu | playing | result
+let diffIdx = 1;
+let chart = [], musicEvents = [], musicIdx = 0;
+let songStart = 0;      // ac.currentTime 基準
+let score = 0, combo = 0, maxCombo = 0;
+let counts = { perfect:0, good:0, miss:0 };
+let popups = [];        // 判定表示 {text,color,time,lane}
+let particles = [];
+let laneFlash = [0,0,0,0];
+let schedTimer = null;
+
+function songTime(){ return ac.currentTime - songStart; }
+
+function startGame(idx){
+  initAudio();
+  if (ac.state === "suspended") ac.resume();
+  diffIdx = idx;
+  curSong = SONGS[songIdx];
+  SPB = 60 / curSong.bpm;
+  SONG_LEN = curSong.measures * 4 * SPB;
+  chart = buildChart(idx);
+  musicEvents = buildMusicEvents();
+  musicIdx = 0;
+  score = 0; combo = 0; maxCombo = 0;
+  counts = { perfect:0, good:0, miss:0 };
+  popups = []; particles = [];
+  songStart = ac.currentTime + 0.15;
+  state = "playing";
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("result").classList.add("hidden");
+  // 先読みスケジューラ（100ms先まで予約）
+  clearInterval(schedTimer);
+  schedTimer = setInterval(() => {
+    const horizon = ac.currentTime + 0.12;
+    while (musicIdx < musicEvents.length && songStart + musicEvents[musicIdx].t < horizon){
+      const e = musicEvents[musicIdx++];
+      e.fn(songStart + e.t);
+    }
+  }, 30);
+}
+
+function endGame(){
+  state = "result";
+  clearInterval(schedTimer);
+  const total = counts.perfect + counts.good + counts.miss;
+  const acc = total ? (counts.perfect + counts.good * 0.5) / total : 0;
+  let rank, color;
+  if      (counts.miss === 0 && counts.good === 0) { rank = "SS"; color = "#ffdf6e"; }
+  else if (acc >= 0.95) { rank = "S"; color = "#ffc94d"; }
+  else if (acc >= 0.85) { rank = "A"; color = "#4dd2ff"; }
+  else if (acc >= 0.70) { rank = "B"; color = "#9dff4d"; }
+  else                  { rank = "C"; color = "#aab"; }
+  document.getElementById("resultTitle").textContent =
+    curSong.title + "（" + DIFFS[diffIdx].name + "）";
+  document.getElementById("rank").textContent = rank;
+  document.getElementById("rank").style.color = color;
+  document.getElementById("rScore").textContent = score.toLocaleString();
+  document.getElementById("rCombo").textContent = maxCombo;
+  document.getElementById("rPerfect").textContent = counts.perfect;
+  document.getElementById("rGood").textContent = counts.good;
+  document.getElementById("rMiss").textContent = counts.miss;
+  document.getElementById("rAcc").textContent = (acc * 100).toFixed(1) + "%";
+  document.getElementById("result").classList.remove("hidden");
+}
+
+/* ---------------- 入力 ---------------- */
+function judge(lane){
+  if (state !== "playing") return;
+  laneFlash[lane] = 1;
+  const t = songTime();
+  let best = null, bestDt = Infinity;
+  for (const n of chart){
+    if (n.hit || n.missed || n.lane !== lane) continue;
+    const dt = Math.abs(n.time - t);
+    if (dt < bestDt){ bestDt = dt; best = n; }
+    if (n.time - t > WIN_GOOD) break; // ソート済みなので打ち切り
+  }
+  if (!best || bestDt > WIN_GOOD) return; // 空打ちはお咎めなし
+  best.hit = true;
+  playHitSfx(lane);
+  const x = lane * LANE_W + LANE_W / 2;
+  if (bestDt <= WIN_PERFECT){
+    counts.perfect++; combo++; score += 300 + combo * 2;
+    popups.push({ text:"PERFECT", color:"#ffdf6e", time:t, lane });
+    spawnParticles(x, HIT_Y, LANE_COLORS[lane], 14);
+    mood = { type:"perfect", time:t };
+  } else {
+    counts.good++; combo++; score += 150 + combo;
+    popups.push({ text:"GOOD", color:"#4dd2ff", time:t, lane });
+    spawnParticles(x, HIT_Y, LANE_COLORS[lane], 7);
+    mood = { type:"good", time:t };
+  }
+  if (combo > maxCombo) maxCombo = combo;
+}
+
+addEventListener("keydown", (e) => {
+  if (e.repeat) return;
+  const lane = KEYS.indexOf(e.code);
+  if (lane >= 0) judge(lane);
+});
+cv.addEventListener("pointerdown", (e) => {
+  const rect = cv.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width * W;
+  if (x >= FIELD_W){            // ダンサーをつつくとジャンプ
+    hopKick = 16;
+    mood = { type:"perfect", time: charTime() };
+    return;
+  }
+  const lane = Math.max(0, Math.min(LANES - 1, Math.floor(x / LANE_W)));
+  judge(lane);
+});
+
+document.querySelectorAll(".songBtn").forEach(b =>
+  b.addEventListener("click", () => {
+    songIdx = +b.dataset.song;
+    document.querySelectorAll(".songBtn").forEach(x => x.classList.toggle("sel", x === b));
+  }));
+document.querySelectorAll("#menu .btn").forEach(b =>
+  b.addEventListener("click", () => startGame(+b.dataset.diff)));
+document.getElementById("retryBtn").addEventListener("click", () => startGame(diffIdx));
+document.getElementById("menuBtn").addEventListener("click", () => {
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("menu").classList.remove("hidden");
+  state = "menu";
+});
+
+/* ---------------- パーティクル ---------------- */
+function spawnParticles(x, y, color, n){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2;
+    const sp = 80 + Math.random() * 220;
+    particles.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60,
+      life: 0.5 + Math.random() * 0.25, age: 0, color,
+      r: 2 + Math.random() * 3,
+    });
+  }
+}
+
+/* ---------------- ダンサー ---------------- */
+const CHAR_X = FIELD_W + PANEL_W / 2;
+const CHAR_GROUND = H - 150;
+let mood = { type:"idle", time:-99 };  // perfect | good | miss | idle
+let hopKick = 0;                       // つついた時のジャンプ
+
+// プレイ中は曲の時刻に同期、メニュー中もゆるく踊り続ける
+function charTime(){
+  return (state === "playing" && ac) ? songTime() : performance.now() / 1000;
+}
+
+function drawPanel(beatPulse, dt){
+  // 背景
+  const g = ctx.createLinearGradient(FIELD_W, 0, W, 0);
+  g.addColorStop(0, "#101024");
+  g.addColorStop(1, "#0b0b16");
+  ctx.fillStyle = g;
+  ctx.fillRect(FIELD_W, 0, PANEL_W, H);
+
+  // スポットライト
+  ctx.fillStyle = "rgba(150,150,255," + (0.05 + beatPulse * 0.05) + ")";
+  ctx.beginPath();
+  ctx.moveTo(CHAR_X - 16, 0); ctx.lineTo(CHAR_X + 16, 0);
+  ctx.lineTo(CHAR_X + 58, CHAR_GROUND + 8); ctx.lineTo(CHAR_X - 58, CHAR_GROUND + 8);
+  ctx.closePath(); ctx.fill();
+
+  // ステージの床
+  ctx.fillStyle = "rgba(150,150,220,.25)";
+  ctx.fillRect(FIELD_W + 12, CHAR_GROUND + 10, PANEL_W - 24, 3);
+
+  // スピーカー（キックに合わせて振動）
+  for (const sx of [FIELD_W + 32, W - 32]){
+    ctx.fillStyle = "#181830";
+    ctx.strokeStyle = "#33345a"; ctx.lineWidth = 2;
+    roundRect(sx - 20, H - 96, 40, 62, 6);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx, H - 66, 12 * (1 + beatPulse * 0.22), 0, Math.PI * 2);
+    ctx.strokeStyle = "#4dd2ff"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx, H - 66, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#4dd2ff"; ctx.fill();
+  }
+
+  // 浮かぶ音符（プレイ中のみ）
+  if (state === "playing"){
+    const t = charTime();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i < 3; i++){
+      const cyc = (t * 40 + i * 90) % 260;
+      const nx = CHAR_X + Math.sin(t * 1.6 + i * 2.1) * 42;
+      const ny = CHAR_GROUND - 60 - cyc;
+      ctx.globalAlpha = Math.max(0, 1 - cyc / 260) * 0.65;
+      ctx.fillStyle = i % 2 ? "#ff5c8a" : "#4dd2ff";
+      ctx.font = "18px sans-serif";
+      ctx.fillText(i % 2 ? "♪" : "♫", nx, ny);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawDancer(dt);
+}
+
+function drawDancer(dt){
+  const t = charTime();
+  const beat = t / SPB;
+  const phase = ((beat % 1) + 1) % 1;
+  const bounce = Math.abs(Math.sin(phase * Math.PI)) * 9 + hopKick;
+  hopKick = Math.max(0, hopKick - dt * 70);
+  const sway = Math.sin(beat * Math.PI) * 0.12;          // 2拍で左右に揺れる
+  const missAgo  = mood.type === "miss"    ? t - mood.time : 99;
+  const happyAgo = mood.type === "perfect" ? t - mood.time : 99;
+
+  const SKIN = "#ffe3cc", HAIR = "#ff5c8a", BODY = "#3b3b70",
+        TRIM = "#4dd2ff", DARK = "#26264a";
+
+  // 足元の影
+  ctx.fillStyle = "rgba(0,0,0,.45)";
+  ctx.beginPath();
+  ctx.ellipse(CHAR_X, CHAR_GROUND + 8, 28 - bounce * 0.6, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(CHAR_X, CHAR_GROUND - bounce);
+  ctx.rotate(sway + (missAgo < 0.45 ? Math.sin(t * 40) * 0.05 : 0));
+  ctx.lineCap = "round";
+
+  // 脚（拍ごとに交互ステップ）
+  const legLift = Math.sin(beat * Math.PI) * 6;
+  ctx.strokeStyle = DARK; ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(-8, -28); ctx.lineTo(-9, -Math.max(0,  legLift));
+  ctx.moveTo( 8, -28); ctx.lineTo( 9, -Math.max(0, -legLift));
+  ctx.stroke();
+
+  // 胴体（ネオントリムのワンピース）
+  ctx.fillStyle = BODY;
+  roundRect(-17, -62, 34, 38, 12); ctx.fill();
+  ctx.strokeStyle = TRIM; ctx.lineWidth = 2;
+  roundRect(-17, -62, 34, 38, 12); ctx.stroke();
+
+  // 腕（左右交互に振り上げる）
+  const leftUp  = (Math.sin(beat * Math.PI) + 1) / 2;
+  const rightUp = 1 - leftUp;
+  for (const [side, up] of [[-1, leftUp], [1, rightUp]]){
+    const sx = side * 15, sy = -56;
+    const a = 0.35 + up * 2.0;                     // 下ろし→振り上げ
+    const ex = sx + side * Math.sin(a) * 21;
+    const ey = sy + Math.cos(a) * 21;
+    ctx.strokeStyle = BODY; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ツインテール（体の揺れに少し遅れてなびく）
+  ctx.fillStyle = HAIR;
+  for (const side of [-1, 1]){
+    ctx.beginPath();
+    ctx.ellipse(side * 27 - sway * 26, -86 + Math.abs(sway) * 8,
+                8, 13, side * 0.4 - sway, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 頭
+  ctx.fillStyle = SKIN;
+  ctx.beginPath(); ctx.arc(0, -82, 21, 0, Math.PI * 2); ctx.fill();
+  // 前髪
+  ctx.fillStyle = HAIR;
+  ctx.beginPath();
+  ctx.arc(0, -84, 22, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(12, -76, 0, -79);
+  ctx.quadraticCurveTo(-12, -76, -21.8, -86);
+  ctx.closePath(); ctx.fill();
+
+  // ヘッドホン
+  ctx.strokeStyle = TRIM; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(0, -84, 25, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.fillStyle = TRIM;
+  ctx.save(); ctx.shadowColor = TRIM; ctx.shadowBlur = 8;
+  roundRect(-29, -90, 8, 16, 3); ctx.fill();
+  roundRect( 21, -90, 8, 16, 3); ctx.fill();
+  ctx.restore();
+
+  // 顔
+  const happy = happyAgo < 0.45 || combo >= 15;
+  if (missAgo < 0.45){                       // >< 顔
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-11, -85); ctx.lineTo(-5, -82); ctx.moveTo(-11, -79); ctx.lineTo(-5, -82);
+    ctx.moveTo( 11, -85); ctx.lineTo( 5, -82); ctx.moveTo( 11, -79); ctx.lineTo( 5, -82);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -72, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = "#333"; ctx.fill();
+  } else if (happy){                          // にこにこ ∪∪
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(-8, -81, 3.6, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc( 8, -81, 3.6, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -74, 5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  } else {                                    // 通常
+    ctx.fillStyle = "#333";
+    ctx.beginPath(); ctx.arc(-8, -81, 2.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 8, -81, 2.7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -73, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  // ほっぺ
+  ctx.fillStyle = "rgba(255,120,150,.4)";
+  ctx.beginPath(); ctx.arc(-14, -74, 3.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( 14, -74, 3.2, 0, Math.PI * 2); ctx.fill();
+
+  // コンボが乗ってる時のキラキラ
+  if (state === "playing" && combo >= 10){
+    for (let i = 0; i < 3; i++){
+      const a = t * 2.2 + i * (Math.PI * 2 / 3);
+      const kx = Math.cos(a) * 46, ky = -60 + Math.sin(a) * 34;
+      ctx.fillStyle = i % 2 ? "#ffdf6e" : "#9dff4d";
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(t * 8 + i);
+      ctx.beginPath(); ctx.arc(kx, ky, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+
+/* ---------------- 描画 ---------------- */
+let lastFrame = performance.now();
+
+function draw(now){
+  requestAnimationFrame(draw);
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+
+  // 背景
+  ctx.fillStyle = "#0d0d1a";
+  ctx.fillRect(0, 0, W, H);
+
+  const t = (state === "playing" && ac) ? songTime() : 0;
+  const beatPulse = state === "playing" ? Math.max(0, 1 - (t % SPB) / SPB * 2.5) : 0;
+
+  drawPanel(beatPulse, dt);
+
+  // レーン背景・境界線
+  for (let i = 0; i < LANES; i++){
+    laneFlash[i] = Math.max(0, laneFlash[i] - dt * 6);
+    if (laneFlash[i] > 0){
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "transparent");
+      g.addColorStop(1, LANE_COLORS[i] + "55");
+      ctx.fillStyle = g;
+      ctx.globalAlpha = laneFlash[i];
+      ctx.fillRect(i * LANE_W, 0, LANE_W, H);
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.strokeStyle = "rgba(120,120,180,.18)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < LANES; i++){
+    ctx.beginPath();
+    ctx.moveTo(i * LANE_W, 0); ctx.lineTo(i * LANE_W, H);
+    ctx.stroke();
+  }
+  // フィールドとダンサーゾーンの仕切り
+  ctx.strokeStyle = "rgba(140,140,220,.35)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(FIELD_W, 0); ctx.lineTo(FIELD_W, H);
+  ctx.stroke();
+
+  // 判定ライン
+  ctx.save();
+  ctx.shadowColor = "#8f8fff";
+  ctx.shadowBlur = 14 + beatPulse * 10;
+  ctx.strokeStyle = "rgba(200,200,255," + (0.75 + beatPulse * 0.25) + ")";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, HIT_Y); ctx.lineTo(FIELD_W, HIT_Y);
+  ctx.stroke();
+  ctx.restore();
+
+  // 判定ゾーンのキーラベル
+  for (let i = 0; i < LANES; i++){
+    const x = i * LANE_W + LANE_W / 2;
+    ctx.beginPath();
+    ctx.arc(x, HIT_Y, 26, 0, Math.PI * 2);
+    ctx.strokeStyle = LANE_COLORS[i] + (laneFlash[i] > 0 ? "ff" : "88");
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = "rgba(230,230,255,.8)";
+    ctx.font = "bold 16px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(KEY_LABELS[i], x, H - 70);
+  }
+
+  if (state === "playing"){
+    const approach = DIFFS[diffIdx].approach;
+    const speed = (HIT_Y + 40) / approach;
+
+    // ノーツ判定（取り逃し）
+    for (const n of chart){
+      if (!n.hit && !n.missed && t > n.time + WIN_GOOD){
+        n.missed = true;
+        counts.miss++; combo = 0;
+        popups.push({ text:"MISS", color:"#8899aa", time:t, lane:n.lane });
+        mood = { type:"miss", time:t };
+      }
+    }
+
+    // ノーツ描画
+    for (const n of chart){
+      if (n.hit || n.missed) continue;
+      const y = HIT_Y - (n.time - t) * speed;
+      if (y < -40 || y > H + 40) continue;
+      const x = n.lane * LANE_W + LANE_W / 2;
+      ctx.save();
+      ctx.shadowColor = LANE_COLORS[n.lane];
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = LANE_COLORS[n.lane];
+      roundRect(x - LANE_W / 2 + 14, y - 12, LANE_W - 28, 24, 12);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "rgba(255,255,255,.35)";
+      roundRect(x - LANE_W / 2 + 20, y - 7, LANE_W - 40, 6, 3);
+      ctx.fill();
+    }
+
+    // スコア・コンボ
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillStyle = "#dde";
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillText("SCORE " + score.toLocaleString(), 14, 12);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#99a";
+    ctx.font = "14px sans-serif";
+    ctx.fillText(curSong.title + "・" + DIFFS[diffIdx].name, FIELD_W - 14, 18);
+    if (combo >= 2){
+      ctx.textAlign = "center";
+      ctx.font = "bold 46px sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,.92)";
+      ctx.save();
+      ctx.shadowColor = "#8f8fff"; ctx.shadowBlur = 18;
+      ctx.fillText(combo, FIELD_W / 2, 190);
+      ctx.restore();
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillStyle = "rgba(180,190,255,.85)";
+      ctx.fillText("COMBO", FIELD_W / 2, 245);
+    }
+
+    // 曲プログレスバー
+    ctx.fillStyle = "rgba(255,255,255,.12)";
+    ctx.fillRect(0, 0, FIELD_W, 4);
+    ctx.fillStyle = "#8f8fff";
+    ctx.fillRect(0, 0, FIELD_W * Math.min(1, Math.max(0, t / SONG_LEN)), 4);
+
+    // 開始前ガイド
+    if (t < 2 * 4 * SPB - 0.2){
+      ctx.textAlign = "center";
+      ctx.font = "bold 26px sans-serif";
+      ctx.fillStyle = "rgba(255,255,255," + (0.5 + 0.5 * Math.sin(t * 6)) + ")";
+      ctx.fillText("READY...", FIELD_W / 2, H / 2 - 60);
+    }
+
+    // 終了判定
+    if (t > SONG_LEN + 1.2) endGame();
+  }
+
+  // 判定ポップアップ
+  if (ac){
+    const now2 = state === "playing" ? t : 0;
+    popups = popups.filter(p => now2 - p.time < 0.6);
+    for (const p of popups){
+      const age = now2 - p.time;
+      const x = p.lane * LANE_W + LANE_W / 2;
+      ctx.globalAlpha = 1 - age / 0.6;
+      ctx.textAlign = "center";
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, x, HIT_Y - 60 - age * 60);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // パーティクル
+  particles = particles.filter(p => p.age < p.life);
+  for (const p of particles){
+    p.age += dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 500 * dt;
+    ctx.globalAlpha = 1 - p.age / p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
