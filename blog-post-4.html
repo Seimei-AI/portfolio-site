@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EF643WNQHJ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-EF643WNQHJ');
+</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リズムゲーム『NEON BEAT』を作った話 | Seimei Abe</title>
+  <meta name="description" content="ポートフォリオに新作『NEON BEAT』を追加しました。BGMをコードで作曲し、譜面をメロディから自動生成するリズムゲームの制作記です。">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="リズムゲーム『NEON BEAT』を作った話 | Seimei Abe">
+  <meta property="og:description" content="ポートフォリオに新作『NEON BEAT』を追加しました。BGMをコードで作曲し、譜面をメロディから自動生成するリズムゲームの制作記です。">
+  <meta property="og:url" content="https://seimei-ai.github.io/portfolio-site/blog-post-4.html">
+  <meta property="og:image" content="https://seimei-ai.github.io/portfolio-site/images/profile.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="リズムゲーム『NEON BEAT』を作った話 | Seimei Abe">
+  <meta name="twitter:description" content="ポートフォリオに新作『NEON BEAT』を追加しました。BGMをコードで作曲し、譜面をメロディから自動生成するリズムゲームの制作記です。">
+  <meta name="twitter:image" content="https://seimei-ai.github.io/portfolio-site/images/profile.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="works.html">Works</a>
+    <a href="blog.html">Blog</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <header>
+    <h1>リズムゲーム『NEON BEAT』を作った話</h1>
+    <p class="blog-date">2026.08.07</p>
+  </header>
+
+  <main>
+    <article>
+      <section>
+        <p>
+          こんにちは、せいめいです。ポートフォリオにまた新しい作品を追加しました。
+          今度は『NEON BEAT』という、落ちてくるノーツをタイミングよくキャッチする4レーンのリズムゲームです。
+          1曲あたり約1分、<a href="neon-beat/index.html" target="_blank" rel="noopener">ブラウザでそのまま遊べます</a>。
+          音が出るゲームなので、ぜひスピーカーかイヤホンをONにして触ってみてください。
+        </p>
+
+        <p>
+          前回の『線香花火の夜に』がしっとりした物語ものだったので、
+          今回は逆に、何も考えずに音に乗って遊べるものを作りたくなりました。
+          「簡単なリズムゲーみたいなの作れる？」という軽いひと言から始まった企画です。
+        </p>
+
+        <p>
+          リズムゲームを作るうえで一番面白かったのは、<strong>音楽そのものをコードで作る</strong>ところです。
+          音源ファイルは1つも使っていません。Web Audioという仕組みで、
+          キック・スネア・ベース・メロディを全部その場で合成して鳴らしています。
+          収録した3曲は、それぞれ性格の違うコード進行から組み立てました。
+        </p>
+
+        <ul>
+          <li><strong>ネオンスター</strong>（BPM128）……C→G→Am→Fの「王道進行」で作ったキラキラポップ</li>
+          <li><strong>サイバーチェイス</strong>（BPM150）……Am→F→C→Gの「小室進行」で作った疾走系マイナー曲</li>
+          <li><strong>ほしぞらメモリー</strong>（BPM104）……F→G→Em→Amの通称「星空進行」で作ったチル曲</li>
+        </ul>
+
+        <p>
+          そしてこの作りには、もうひとつ良いことがありました。曲がデータでできているので、
+          <strong>譜面（ノーツの配置）はメロディから自動で生成される</strong>んです。
+          高い音は右のレーン、低い音は左のレーンに割り当てられるので、
+          ノーツを叩いていくと自然とメロディを演奏している気持ちよさがあります。
+          難易度は3段階で、間引くノーツの量と落下スピードが変わる仕組みです。
+        </p>
+
+        <p>
+          個人的なお気に入りは、画面の右端で踊っているダンサーちゃんです。
+          「キャラクターが音楽に合わせて踊ってたら楽しそう」と注文したら、その日のうちに実装されました。
+          曲のBPMにぴったり同期して跳ねて、PERFECTを取るとニコニコし、ミスすると「&gt;&lt;」の顔になります。
+          プレイ中に見ている余裕はあまりないんですが、リザルト画面の裏でも踊り続けているので、ぜひ見てあげてください。
+          つつくと喜びます。
+        </p>
+
+        <p>
+          今回もHTML / CSS / JavaScriptの1ファイル構成で、制作は相棒のAIと二人三脚です。
+          「こうしたい」を出すのが自分、実装の手を動かすのがAI。
+          リズムゲーム本体→踊るキャラ追加→楽曲3曲に増量、と注文を重ねましたが、全部その日のうちに形になりました。
+          このスピード感は、作っていて本当に楽しいです。
+        </p>
+
+        <p>
+          キーボード（D・F・J・K）でもスマホのタップでも遊べます。
+          まずは「かんたん」で1曲、音に乗ってみてください。
+          遊んで「よかったな」と思ったら、<a href="works.html">Worksページ</a>の「♥ いいね」ボタンを押してもらえると励みになります。
+        </p>
+      </section>
+    </article>
+
+    <p><a href="blog.html">← ブログ一覧に戻る</a></p>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Seimei Abe</p>
+  </footer>
+
+</body>
+</html>
